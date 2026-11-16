@@ -83,7 +83,7 @@
     var asc = (m.actualBoundingBoxAscent || 62) / 100;
     var desc = (m.actualBoundingBoxDescent || 24) / 100;
     // free band: below the bar, above the intro paragraph
-    var top = (bar ? bar.offsetHeight : 64) + (narrow ? 20 : 60);
+    var top = (bar ? bar.offsetHeight : 64) + (narrow ? 34 : 60);
     var bottom = intro ? intro.offsetTop - (narrow ? 28 : 40) : heroH * 0.75;
     var git = $('.hero__git');
     if (git && !narrow) bottom = Math.min(bottom, git.offsetTop - 32);

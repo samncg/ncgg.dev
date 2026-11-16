@@ -657,7 +657,8 @@ html.drawer-open { overflow: hidden; }
   .theme__label { display: none; }
   .bar__toggles { gap: 6px; }
   .hero__side { display: none; }
-  .hero { --hero-b: 96px; }
+  .hero { --hero-b: 96px; height: calc(100vh + 150px); height: calc(100svh + 150px); }
+  .edge--top { height: 96px; }
   .hero__intro { bottom: calc(var(--hero-b) + 166px); max-width: 30ch; }
   .hero__git { left: var(--gut); right: var(--gut); width: auto; bottom: var(--hero-b); }
   .hero__readout { display: none !important; }
