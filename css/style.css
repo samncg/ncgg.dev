@@ -240,7 +240,7 @@ main, .foot { position: relative; z-index: 2; }
   height: 100vh; height: 100svh;
   min-height: 520px;
   padding: 0 var(--gut);
-  --hero-b: clamp(100px, 12vh, 132px);
+  --hero-b: clamp(88px, 10vh, 116px);
 }
 .hero__intro {
   position: absolute; left: var(--gut); bottom: var(--hero-b);
@@ -261,7 +261,7 @@ main, .foot { position: relative; z-index: 2; }
 .readout__row { display: inline-flex; gap: 8px; }
 .readout__row b { color: var(--fg); font-weight: 400; min-width: 4ch; text-align: right; }
 .hero__git {
-  position: absolute; right: var(--gut); bottom: calc(var(--hero-b) + 60px);
+  position: absolute; right: calc(var(--gut) + 30px); bottom: calc(var(--hero-b) + 52px);
   width: min(460px, 40vw);
   font-size: var(--step--1); line-height: 1.6;
   text-shadow: 0 0 10px var(--bg);
