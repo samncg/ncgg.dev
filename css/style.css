@@ -260,7 +260,38 @@ main, .foot { position: relative; z-index: 2; }
 }
 .readout__row { display: inline-flex; gap: 8px; }
 .readout__row b { color: var(--fg); font-weight: 400; min-width: 4ch; text-align: right; }
-.readout__hint { margin-top: 8px; color: var(--fg-2); }
+.hero__git {
+  position: absolute; right: var(--gut); bottom: calc(var(--hero-b) + 60px);
+  width: min(460px, 40vw);
+  font-size: var(--step--1); line-height: 1.6;
+  text-shadow: 0 0 10px var(--bg);
+}
+.hero__git-head {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--fg); padding: 2px 0 6px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s var(--ease);
+}
+.hero__git-head svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.4; }
+.hero__git-head:hover { border-bottom-color: var(--fg); }
+.hero__heat { margin: 4px 0 10px; }
+.hero__heat-map { display: block; width: 100%; height: 64px; cursor: crosshair; }
+.hero__heat-cap { margin-top: 6px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+.hero__git-log { list-style: none; margin: 0; padding: 0; height: calc(1.6em * 4); }
+.hero__git-log li { height: 1.6em; }
+.hero__git-note { color: var(--fg-3); }
+.hero__git-log a {
+  display: grid; grid-template-columns: 7ch 11ch minmax(0, 1fr) 4ch; gap: 0 10px;
+  color: var(--fg-2); white-space: nowrap;
+  transition: color 0.3s var(--ease);
+}
+.hero__git-log a > span { overflow: hidden; text-overflow: ellipsis; }
+.hero__git-log a:hover, .hero__git-log a:focus-visible { color: var(--fg); }
+.hero__git-sha { color: var(--fg-3); }
+.hero__git-age { text-align: right; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+.hero__git-log li.is-new { animation: gitIn 0.9s var(--ease) both; animation-delay: var(--d, 0s); }
+@keyframes gitIn { from { opacity: 0; filter: blur(6px); transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .hero__git-log li.is-new { animation: none; } }
 .hero__side {
   position: absolute; right: var(--gut); top: 50%;
   transform: translate(50%, -50%) rotate(180deg);
@@ -566,6 +597,9 @@ html.drawer-open { overflow: hidden; }
 .action:hover { background: var(--fg); color: var(--bg); }
 .action:hover::before, .action:hover::after { color: var(--bg); }
 .action:hover .tag { color: var(--on-fg-muted); }
+.action__val { color: var(--fg-2); margin-left: 4px; }
+.action__hint { color: var(--fg-3); }
+.action:hover .action__val, .action:hover .action__hint { color: inherit; }
 .action[data-state="done"]::before, .action[data-state="done"]::after { color: var(--fg); }
 .contact__actions { margin-left: -10px; }
 
@@ -624,12 +658,17 @@ html.drawer-open { overflow: hidden; }
   .bar__toggles { gap: 6px; }
   .hero__side { display: none; }
   .hero { --hero-b: 96px; }
-  .hero__intro { bottom: calc(var(--hero-b) + 40px); max-width: 30ch; }
+  .hero__intro { bottom: calc(var(--hero-b) + 166px); max-width: 30ch; }
+  .hero__git { left: var(--gut); right: var(--gut); width: auto; bottom: var(--hero-b); }
+  .hero__readout { display: none !important; }
+  .hero__git-log { height: calc(1.6em * 2); }
+  .hero__git-log li:nth-child(n+3) { display: none; }
+  .hero__git-log a { grid-template-columns: 10ch minmax(0, 1fr) 4ch; }
+  .hero__git-sha { display: none; }
   .hero__readout { left: var(--gut); right: auto; bottom: var(--hero-b); justify-items: start; }
   .hero__readout .readout__row:first-child { display: none; }
   .readout__row { display: none; }
-  .readout__hint { margin-top: 0; }
-  .hero__scroll { left: auto; right: calc(var(--gut) - 8px); transform: none; bottom: calc(var(--hero-b) - 12px); }
+  .hero__scroll { display: none; }
   .practice .display { text-align: left; }
   .discipline { grid-template-columns: 1fr auto; }
   .discipline p { grid-column: 1 / -1; grid-row: 2; }

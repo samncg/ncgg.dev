@@ -7,9 +7,10 @@
   // Set `emailPlaceholder` to false once `email` is your real address;
   // that removes the visible "placeholder" mark under it.
   var CONTACT = {
-    email: 'samncgg@gmail.com',
+    email: 'hello@ncgg.dev',
     emailPlaceholder: false,
-    github: 'https://github.com/samncg'
+    github: 'https://github.com/samncg',
+    discord: 'ncg_'
   };
 
   var root = document.documentElement;
@@ -39,8 +40,6 @@
   var year = $('[data-year]');
   if (year) year.textContent = String(new Date().getFullYear());
 
-  var hint = $('[data-hint]');
-  if (hint && coarse) hint.textContent = 'drag to stir · tap to splash';
 
   /* ---------- split text for per-glyph weight ---------- */
 
@@ -86,6 +85,8 @@
     // free band: below the bar, above the intro paragraph
     var top = (bar ? bar.offsetHeight : 64) + (narrow ? 20 : 32);
     var bottom = intro ? intro.offsetTop - (narrow ? 28 : 40) : heroH * 0.75;
+    var git = $('.hero__git');
+    if (git && !narrow) bottom = Math.min(bottom, git.offsetTop - 32);
     var avail = Math.max(60, bottom - top);
     var lines, fs, x;
     if (narrow) {
@@ -121,6 +122,7 @@
     if (field) field.setTheme(t);
     medias.forEach(function (m) { m.setTheme(t); });
     if (themeMeta) themeMeta.setAttribute('content', t.meta);
+    drawHeat();
     if (themeBtn) {
       var next = name === 'light' ? 'dark' : 'light';
       $('.theme__label', themeBtn).textContent = next;
@@ -220,11 +222,6 @@
   }, { passive: true });
   window.addEventListener('touchend', function () { if (field) field.pointerLeave(); }, { passive: true });
 
-  document.addEventListener('pointerdown', function (e) {
-    if (!field || e.button > 0) return;
-    if (e.target.closest('a, button, input, textarea, select, dialog, [data-copy]')) return;
-    field.burst(e.clientX, e.clientY, coarse ? 7 : 10);
-  });
 
   /* ---------- scroll ---------- */
 
@@ -391,33 +388,173 @@
 
   /* ---------- copy email ---------- */
 
-  var copyBtn = $('[data-copy]');
   var live = $('[data-live]');
-  if (copyBtn) {
-    var label = $('[data-copy-label]', copyBtn);
+  $$('[data-copy]').forEach(function (btn) {
+    var label = $('[data-copy-label]', btn);
+    var idle = label.textContent;
+    var what = btn.getAttribute('data-copy-what') || 'Email address';
+    var isDiscord = btn.getAttribute('data-copy') === 'discord';
+    var target = isDiscord ? $('[data-discord-name]') : mail;
     var timer = 0;
-    copyBtn.addEventListener('click', function () {
+    btn.addEventListener('click', function () {
+      var value = isDiscord ? CONTACT.discord : CONTACT.email;
       var done = function (ok) {
         label.textContent = ok ? 'copied' : 'selected, copy it';
-        copyBtn.setAttribute('data-state', ok ? 'done' : 'fail');
-        if (live) live.textContent = ok ? 'Email address copied to clipboard.' : 'Copy failed. Select the address to copy it.';
+        btn.setAttribute('data-state', ok ? 'done' : 'fail');
+        if (live) live.textContent = ok ? what + ' copied to clipboard.' : 'Copy failed. Select the text to copy it.';
         clearTimeout(timer);
-        timer = setTimeout(function () {
-          label.textContent = 'copy email';
-          copyBtn.removeAttribute('data-state');
-        }, 2200);
-        if (!ok && mail) {
+        timer = setTimeout(function () { label.textContent = idle; btn.removeAttribute('data-state'); }, 2200);
+        if (!ok && target) {
           var sel = window.getSelection(), range = document.createRange();
-          range.selectNodeContents(mail); sel.removeAllRanges(); sel.addRange(range);
+          range.selectNodeContents(target); sel.removeAllRanges(); sel.addRange(range);
         }
       };
       if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(CONTACT.email).then(function () { done(true); }, function () { done(false); });
-      } else {
-        done(false);
-      }
+        navigator.clipboard.writeText(value).then(function () { done(true); }, function () { done(false); });
+      } else done(false);
     });
-  }
+  });
+
+  /* ---------- contribution heatmap (public calendar via github-contributions-api, cached 1 h) ---------- */
+
+  var drawHeat = function () {};
+  (function () {
+    var cv = $('[data-heat]'), cap = $('[data-heat-cap]');
+    if (!cv || !cap || !window.fetch) return;
+    var KEY = 'ncgg:heat', TTL = 60 * 60 * 1000, days = null, total = 0, cells = [];
+    var MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    function summary() { cap.textContent = total + ' contributions in the last year'; }
+    drawHeat = function () {
+      if (!days) return;
+      var r = cv.getBoundingClientRect();
+      if (!r.width) return;
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var first = new Date(days[0].date + 'T00:00:00').getDay();
+      var weeks = Math.ceil((days.length + first) / 7);
+      var gap = r.width < 420 ? 1 : 2;
+      var cell = Math.max(2.5, (r.width - gap * (weeks - 1)) / weeks);
+      var h = cell * 7 + gap * 6;
+      cv.style.height = h + 'px';
+      cv.width = Math.round(r.width * dpr); cv.height = Math.round(h * dpr);
+      var ctx = cv.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      var cs = getComputedStyle(root);
+      var fg = cs.getPropertyValue('--fg-rgb').trim().split(/\s+/).join(',');
+      var line = cs.getPropertyValue('--line-2').trim();
+      var ALPHA = [0, 0.28, 0.5, 0.75, 1];
+      var offset = 0;
+      cells = [];
+      days.forEach(function (d, i) {
+        var k = i + first, x = offset + Math.floor(k / 7) * (cell + gap), y = (k % 7) * (cell + gap);
+        ctx.fillStyle = d.level ? 'rgba(' + fg + ',' + ALPHA[d.level] + ')' : line;
+        ctx.fillRect(x, y, cell, cell);
+        cells.push({ x: x, y: y, s: cell, d: d });
+      });
+    };
+    cv.addEventListener('mousemove', function (e) {
+      var r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+      for (var i = 0; i < cells.length; i++) {
+        var c = cells[i];
+        if (mx >= c.x && mx < c.x + c.s + 2 && my >= c.y && my < c.y + c.s + 2) {
+          var dt = new Date(c.d.date + 'T00:00:00');
+          cap.textContent = c.d.count + (c.d.count === 1 ? ' contribution' : ' contributions') + ' on ' + dt.getDate() + ' ' + MONTHS[dt.getMonth()] + ' ' + dt.getFullYear();
+          return;
+        }
+      }
+      summary();
+    });
+    cv.addEventListener('mouseleave', function () { if (days) summary(); });
+    window.addEventListener('resize', function () { drawHeat(); });
+
+    function use(data) {
+      days = data.contributions; total = data.total;
+      cv.setAttribute('aria-label', 'GitHub contribution heatmap: ' + total + ' contributions in the last year');
+      summary(); drawHeat();
+    }
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { cached = null; }
+    if (cached && cached.days && Date.now() - cached.at < TTL) { use({ contributions: cached.days, total: cached.total }); return; }
+    fetch('https://github-contributions-api.jogruber.de/v4/samncg?y=last')
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) {
+        var list = (d.contributions || []).map(function (c) { return { date: c.date, count: c.count, level: c.level }; });
+        var tot = d.total && (d.total.lastYear != null ? d.total.lastYear : 0);
+        if (!list.length) throw new Error('empty');
+        try { localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), days: list, total: tot })); } catch (e) {}
+        use({ contributions: list, total: tot });
+      })
+      .catch(function () {
+        if (cached && cached.days) use({ contributions: cached.days, total: cached.total });
+        else { cv.hidden = true; cap.textContent = 'contribution graph unavailable right now'; }
+      });
+  })();
+
+  /* ---------- recent public commits (GitHub REST, cached 15 min) ---------- */
+
+  (function () {
+    var log = $('[data-git-log]');
+    if (!log || !window.fetch) return;
+    var USER = 'samncg', KEY = 'ncgg:commits', TTL = 15 * 60 * 1000;
+    function age(iso) {
+      var s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+      if (s < 3600) return Math.max(1, Math.round(s / 60)) + 'm';
+      if (s < 86400) return Math.round(s / 3600) + 'h';
+      if (s < 86400 * 30) return Math.round(s / 86400) + 'd';
+      if (s < 86400 * 365) return Math.round(s / (86400 * 30)) + 'mo';
+      return Math.round(s / (86400 * 365)) + 'y';
+    }
+    function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+    function render(list) {
+      log.textContent = '';
+      if (!list.length) { log.appendChild(el('li', 'hero__git-note', 'no public commits yet')); return; }
+      list.slice(0, 4).forEach(function (c, i) {
+        var li = el('li', 'is-new');
+        li.style.setProperty('--d', (i * 0.09) + 's');
+        var a = el('a');
+        a.href = c.url; a.target = '_blank'; a.rel = 'noopener';
+        a.setAttribute('aria-label', c.repo + ': ' + c.msg + ', ' + age(c.date) + ' ago');
+        a.appendChild(el('span', 'hero__git-sha', c.sha));
+        a.appendChild(el('span', 'hero__git-repo', c.repo));
+        a.appendChild(el('span', 'hero__git-msg', c.msg));
+        a.appendChild(el('span', 'hero__git-age', age(c.date)));
+        li.appendChild(a);
+        log.appendChild(li);
+      });
+    }
+    function fail() {
+      log.textContent = '';
+      log.appendChild(el('li', 'hero__git-note', 'commits unavailable right now'));
+    }
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { cached = null; }
+    if (cached && cached.list && Date.now() - cached.at < TTL) { render(cached.list); return; }
+    function get(url) {
+      return fetch(url, { headers: { Accept: 'application/vnd.github+json' } }).then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      });
+    }
+    get('https://api.github.com/users/' + USER + '/repos?sort=pushed&per_page=6&type=owner')
+      .then(function (repos) {
+        repos = repos.filter(function (r) { return !r.fork; }).slice(0, 3);
+        return Promise.all(repos.map(function (r) {
+          return get('https://api.github.com/repos/' + r.full_name + '/commits?per_page=3').then(function (cs) {
+            return cs.map(function (c) {
+              return { repo: r.name, sha: c.sha.slice(0, 7), msg: (c.commit.message || '').split('\n')[0],
+                date: (c.commit.author || c.commit.committer || {}).date, url: c.html_url };
+            });
+          }, function () { return []; });
+        }));
+      })
+      .then(function (groups) {
+        var list = [].concat.apply([], groups).filter(function (c) { return c.date; });
+        list.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
+        list = list.slice(0, 4);
+        try { localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), list: list })); } catch (e) {}
+        render(list);
+      })
+      .catch(function () { if (cached && cached.list) render(cached.list); else fail(); });
+  })();
 
   /* ---------- photo drawer ---------- */
 
