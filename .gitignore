@@ -1,0 +1,16 @@
+# local AI tooling
+.claude/
+.agent/
+.dsh/
+.gemini/
+
+# impeccable local state (review/ and mocks/ ignore themselves)
+.impeccable/config.local.json
+.impeccable/hook.cache.json
+
+# build output
+dist/
+
+# OS
+.DS_Store
+Thumbs.db

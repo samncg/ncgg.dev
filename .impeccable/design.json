@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-17T00:00:00Z",
+  "title": "Design System: ncgg.dev",
+  "extensions": {
+    "colorMeta": {
+      "bone-white": { "role": "primary", "displayName": "Bone White", "canonical": "#ededed", "tonalRamp": ["#262626", "#3a3a3a", "#525252", "#6a6a6a", "#8a8a8a", "#a3a3a3", "#c8c8c8", "#ededed"] },
+      "void-black": { "role": "neutral", "displayName": "Void Black", "canonical": "#000000", "tonalRamp": ["#000000", "#0a0a0a", "#141414", "#1f1f1f", "#2c2c2c", "#363636", "#4a4a4a", "#6a6a6a"] },
+      "ash-gray": { "role": "neutral", "displayName": "Ash Gray", "canonical": "#a3a3a3", "tonalRamp": ["#262626", "#3a3a3a", "#525252", "#6a6a6a", "#8a8a8a", "#a3a3a3", "#c8c8c8", "#ededed"] },
+      "smoke-gray": { "role": "neutral", "displayName": "Smoke Gray", "canonical": "#8a8a8a", "tonalRamp": ["#262626", "#3a3a3a", "#525252", "#6a6a6a", "#8a8a8a", "#a3a3a3", "#c8c8c8", "#ededed"] },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#363636", "tonalRamp": ["#0a0a0a", "#141414", "#1f1f1f", "#2c2c2c", "#363636", "#4a4a4a", "#6a6a6a", "#8a8a8a"] },
+      "hairline-dim": { "role": "neutral", "displayName": "Hairline Dim", "canonical": "#1f1f1f", "tonalRamp": ["#000000", "#0a0a0a", "#141414", "#1f1f1f", "#2c2c2c", "#363636", "#4a4a4a", "#6a6a6a"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Section headings; same treatment scales to language names and the contact address. Per-glyph weight follows the cursor." },
+      "headline": { "displayName": "Headline", "purpose": "Discipline names in the practice list; bold to 700 on row hover." },
+      "title": { "displayName": "Title", "purpose": "Work piece titles." },
+      "statement": { "displayName": "Statement", "purpose": "The about statement, max 38ch." },
+      "body": { "displayName": "Body", "purpose": "Descriptions and ledes, max 52ch." },
+      "label": { "displayName": "Label", "purpose": "Nav, controls, tags, metadata, readouts, footer; lowercase." }
+    },
+    "shadows": [
+      { "name": "text-halo", "value": "0 0 18px #000, 0 0 6px #000", "purpose": "Zero-offset black glow behind text set directly on the glyph field." },
+      { "name": "veil", "value": "background: rgba(0,0,0,0.62); backdrop-filter: blur(5px); mask: radial-gradient(closest-side, #000 62%, transparent)", "purpose": "Soft blurred plate behind text columns over the field." },
+      { "name": "row-veil", "value": "background: rgba(0,0,0,0.72); backdrop-filter: blur(6px); opacity: 0.6 (1 on hover)", "purpose": "Plate behind practice rows." },
+      { "name": "edge-blur", "value": "five stacked layers at backdrop-filter blur 1px, 2px, 4px, 8px, 14px with stepped linear-gradient masks; top band 132px, bottom band 84px", "purpose": "Progressive blur dissolving content at viewport top and bottom." }
+    ],
+    "motion": [
+      { "name": "ease-house", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "The single easing for every transition and animation." },
+      { "name": "state-fast", "value": "0.3s", "purpose": "Color and fill changes on links and controls." },
+      { "name": "state-slow", "value": "0.5s-0.7s", "purpose": "Underline growth, weight shifts, media hover." },
+      { "name": "reveal", "value": "opacity 0.08 to 1 over 1.1s; blur 14px to 0 and translateY 18px to 0 over 1.3s", "purpose": "Unblur-on-entry for sections; JS and motion-allowed only." },
+      { "name": "scramble", "value": "420ms, pool .:-=+*#%@/\\|~<>[]{}", "purpose": "ASCII scramble on nav and marker hover." },
+      { "name": "field-fade", "value": "opacity 0 to 1 over 1.6s", "purpose": "Glyph field fade-in after fonts load." }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "1024px" },
+      { "name": "sm", "value": "720px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Bracketed Action",
+      "kind": "button",
+      "refersTo": "action",
+      "description": "Primary control: lowercase label in brackets; inverts to bone white on hover.",
+      "html": "<button class=\"ds-action\" type=\"button\"><svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><rect x=\"5\" y=\"5\" width=\"8\" height=\"8\"/><path d=\"M3 11V3h8\"/></svg><span>copy email</span></button>",
+      "css": ".ds-action { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; background: none; border: 0; border-radius: 0; cursor: pointer; font-family: \"Azeret Mono\", ui-monospace, monospace; font-size: 0.75rem; letter-spacing: 0.02em; color: #ededed; transition: background 0.3s cubic-bezier(0.16,1,0.3,1), color 0.3s cubic-bezier(0.16,1,0.3,1); } .ds-action::before { content: \"[\"; color: #a3a3a3; margin-right: 2px; } .ds-action::after { content: \"]\"; color: #a3a3a3; margin-left: 2px; } .ds-action svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; } .ds-action:hover { background: #ededed; color: #000; } .ds-action:hover::before, .ds-action:hover::after { color: #000; } .ds-action:focus-visible { outline: 1px solid #ededed; outline-offset: 5px; border-radius: 2px; }"
+    },
+    {
+      "name": "Motion Toggle",
+      "kind": "button",
+      "refersTo": "motion-toggle",
+      "description": "Bracketed status toggle with a pulsing dot; hollow ring when off.",
+      "html": "<button class=\"ds-motion\" type=\"button\" aria-pressed=\"true\"><span class=\"ds-motion__dot\"></span><span>motion on</span></button>",
+      "css": ".ds-motion { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 2px; background: none; border: 0; cursor: pointer; font-family: \"Azeret Mono\", ui-monospace, monospace; font-size: 0.75rem; letter-spacing: 0.02em; color: #a3a3a3; transition: color 0.3s cubic-bezier(0.16,1,0.3,1); } .ds-motion::before { content: \"[\"; } .ds-motion::after { content: \"]\"; } .ds-motion:hover { color: #ededed; } .ds-motion:focus-visible { outline: 1px solid #ededed; outline-offset: 5px; border-radius: 2px; } .ds-motion__dot { width: 6px; height: 6px; border-radius: 50%; background: #ededed; animation: ds-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite; } .ds-motion[aria-pressed=\"false\"] .ds-motion__dot { background: transparent; box-shadow: inset 0 0 0 1px #8a8a8a; animation: none; } @keyframes ds-pulse { 0% { box-shadow: 0 0 0 0 rgba(237,237,237,0.35); } 70%, 100% { box-shadow: 0 0 0 7px rgba(237,237,237,0); } }"
+    },
+    {
+      "name": "Navigation Bar",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Wordmark left, lowercase ash-gray links right; hover and current turn bone white with a growing underline.",
+      "html": "<nav class=\"ds-bar\"><a class=\"ds-bar__mark\" href=\"#\">ncgg.dev</a><div class=\"ds-bar__nav\"><a href=\"#\" aria-current=\"true\">about</a><a href=\"#\">work</a><a href=\"#\">contact</a></div></nav>",
+      "css": ".ds-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; padding: 0 24px; background: #000; font-family: \"Azeret Mono\", ui-monospace, monospace; font-size: 0.75rem; letter-spacing: 0.02em; } .ds-bar a { text-decoration: none; } .ds-bar__mark { color: #ededed; font-weight: 500; padding: 8px 0; } .ds-bar__nav { display: flex; gap: 24px; } .ds-bar__nav a { position: relative; color: #a3a3a3; padding: 8px 0; transition: color 0.3s cubic-bezier(0.16,1,0.3,1); } .ds-bar__nav a::after { content: \"\"; position: absolute; left: 0; right: 0; bottom: 4px; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform 0.5s cubic-bezier(0.16,1,0.3,1); } .ds-bar__nav a:hover, .ds-bar__nav a[aria-current=\"true\"] { color: #ededed; } .ds-bar__nav a:hover::after, .ds-bar__nav a[aria-current=\"true\"]::after { transform: scaleX(1); } .ds-bar a:focus-visible { outline: 1px solid #ededed; outline-offset: 5px; border-radius: 2px; }"
+    },
+    {
+      "name": "Annotation Tag",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "Inline annotation in angle brackets; marks placeholder content.",
+      "html": "<span class=\"ds-tag\">placeholder</span>",
+      "css": ".ds-tag { font-family: \"Azeret Mono\", ui-monospace, monospace; font-size: 0.75rem; letter-spacing: 0.02em; color: #a3a3a3; } .ds-tag::before { content: \"<\"; color: #8a8a8a; } .ds-tag::after { content: \">\"; color: #8a8a8a; }"
+    },
+    {
+      "name": "Discipline Row",
+      "kind": "custom",
+      "refersTo": "rule-list",
+      "description": "Hairline-ruled row on a blur veil; name bolds and shifts on hover.",
+      "html": "<ul class=\"ds-rows\"><li class=\"ds-row\"><h3>CAD design</h3><p>Parts, assemblies and mechanisms modelled to be made.</p><span class=\"ds-row__glyph\">[]</span></li></ul>",
+      "css": ".ds-rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid #363636; background: #000; } .ds-row { display: grid; grid-template-columns: minmax(0,5fr) minmax(0,6fr) auto; align-items: baseline; gap: 12px 32px; padding: 24px 0; border-bottom: 1px solid #363636; font-family: \"Azeret Mono\", ui-monospace, monospace; font-size: 0.9375rem; line-height: 1.6; } .ds-row h3 { margin: 0; font-family: \"Martian Mono\", ui-monospace, monospace; font-size: 2rem; font-weight: 300; font-variation-settings: \"wdth\" 87.5; letter-spacing: -0.03em; line-height: 1.05; color: #ededed; transition: font-weight 0.6s cubic-bezier(0.16,1,0.3,1), letter-spacing 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1); } .ds-row p { margin: 0; color: #a3a3a3; transition: color 0.4s cubic-bezier(0.16,1,0.3,1); } .ds-row__glyph { color: #8a8a8a; font-size: 0.75rem; transition: color 0.4s cubic-bezier(0.16,1,0.3,1); } .ds-row:hover h3 { font-weight: 700; letter-spacing: -0.04em; transform: translateX(10px); } .ds-row:hover p, .ds-row:hover .ds-row__glyph { color: #ededed; }"
+    },
+    {
+      "name": "Media Frame",
+      "kind": "card",
+      "refersTo": "media-frame",
+      "description": "Hairline-bordered square-cornered frame with a + registration mark and a clearing bottom blur.",
+      "html": "<figure class=\"ds-piece\"><div class=\"ds-piece__media\"></div><figcaption><h3>FTC robot <span class=\"ds-piece__tag\">placeholder</span></h3><p class=\"ds-piece__meta\">robotics · cad · java</p></figcaption></figure>",
+      "css": ".ds-piece { margin: 0; max-width: 360px; font-family: \"Azeret Mono\", ui-monospace, monospace; } .ds-piece__media { position: relative; aspect-ratio: 16 / 10; border: 1px solid #363636; background: repeating-linear-gradient(0deg, #000 0 15px, #141414 15px 16px); transition: border-color 0.5s cubic-bezier(0.16,1,0.3,1); } .ds-piece__media::before { content: \"+\"; position: absolute; top: -9px; left: -4px; font-size: 12px; line-height: 1; color: #a3a3a3; } .ds-piece:hover .ds-piece__media { border-color: #6a6a6a; } .ds-piece figcaption { padding-top: 18px; display: grid; gap: 6px; } .ds-piece h3 { margin: 0; display: flex; gap: 12px; align-items: center; font-family: \"Martian Mono\", ui-monospace, monospace; font-weight: 400; font-variation-settings: \"wdth\" 87.5; font-size: 1.15rem; letter-spacing: -0.02em; color: #ededed; } .ds-piece__tag { font-family: \"Azeret Mono\", ui-monospace, monospace; font-size: 0.75rem; color: #a3a3a3; } .ds-piece__tag::before { content: \"<\"; color: #8a8a8a; } .ds-piece__tag::after { content: \">\"; color: #8a8a8a; } .ds-piece__meta { margin: 0; color: #8a8a8a; font-size: 0.75rem; }"
+    },
+    {
+      "name": "Facts List",
+      "kind": "custom",
+      "refersTo": "facts",
+      "description": "Auto-fit grid of term/value pairs, each topped by a hairline.",
+      "html": "<dl class=\"ds-facts\"><div><dt>competed</dt><dd>FTC · NRC</dd></div><div><dt>writes</dt><dd>Java · C# · Python</dd></div></dl>",
+      "css": ".ds-facts { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 22px 28px; font-family: \"Azeret Mono\", ui-monospace, monospace; font-size: 0.75rem; background: #000; } .ds-facts div { border-top: 1px solid #363636; padding-top: 12px; } .ds-facts dt { color: #8a8a8a; margin-bottom: 4px; } .ds-facts dd { margin: 0; color: #ededed; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Terminal in the Current",
+    "overview": "The page is a running simulation before it is a document. A stable-fluids solver fills the viewport with gray ASCII glyphs on pure black, and every other element (the wordmark, section headings, text columns, project media) either is made of glyphs or floats on top of that field. The visitor's cursor, scroll and clicks push the fluid; the interface answers movement rather than waiting for it.\n\nEverything is monospace and monochrome. Hierarchy comes from scale, weight and the variable width axis of one display face, and from three steps of gray, never from hue. Structure is drawn with 1px hairlines; depth comes from progressive backdrop blur and soft black veils that quiet the field behind text, not from shadows or raised surfaces. Interactive controls borrow terminal syntax: brackets around actions, angle brackets around annotations.\n\nDensity is low and placement is deliberate: a 12-column grid used asymmetrically, display headings set left, right or full width per section, work media staggered across columns at varied aspect ratios.",
+    "keyCharacteristics": [
+      "Pure black ground with a live gray ASCII glyph field behind all content.",
+      "Monospace only: Martian Mono for display, Azeret Mono for everything else.",
+      "No hue anywhere; three text grays and two hairline grays.",
+      "Depth by progressive blur and black veils, never by shadow or card.",
+      "Terminal syntax as ornament: `[ action ]`, `<annotation>`, ASCII markers.",
+      "Motion that answers the visitor: weight follows the cursor, text scrambles on hover, content unblurs on entry."
+    ],
+    "rules": [
+      { "name": "The No-Hue Rule", "body": "Nothing on the page carries chroma. State, emphasis and selection are expressed by moving between the grays and bone white, or by inverting to bone white on black.", "section": "colors" },
+      { "name": "The Brighten-On-Attention Rule", "body": "Interactive and hovered elements step up one gray (smoke to ash, ash to bone white); nothing ever dims to signal interaction.", "section": "colors" },
+      { "name": "The Lowercase Interface Rule", "body": "Nav, controls, headings and labels are lowercase. No uppercase-tracked labels.", "section": "typography" },
+      { "name": "The Weight-Follows-Cursor Rule", "body": "Display headings, language names and the contact address are split per character; each character's weight and width track cursor proximity (resting at 300 and `wdth` 87.5). Discipline names jump from 300 to 700 on row hover.", "section": "typography" },
+      { "name": "The Blur-Not-Shadow Rule", "body": "Separation from the field is made with backdrop blur and black veils. Shadows appear only as zero-offset black halos behind text, never as offset or tinted drop shadows.", "section": "elevation" },
+      { "name": "The Unblur-On-Entry Rule", "body": "Revealed content enters from 8% opacity, 14px blur and 18px down, settling over 1.1 to 1.3s on the house easing; only with JS and only when motion is allowed.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the ground pure black (`#000`) and let the glyph field show between and around content.",
+      "Do express hierarchy with the three text grays, size, and Martian Mono's weight and width axes.",
+      "Do place a blur veil behind any text column that sits over the field.",
+      "Do frame actions as `[ label ]` and annotations as `<label>`, in lowercase label type.",
+      "Do draw structure with 1px hairlines (`#363636`) and keep every corner square.",
+      "Do ease every transition on `cubic-bezier(0.16, 1, 0.3, 1)`, and keep all continuous motion pausable and off under reduced motion.",
+      "Do render imagery grayscale."
+    ],
+    "donts": [
+      "Don't introduce any hue, including for links, focus, success or error states.",
+      "Don't use a non-monospace typeface anywhere.",
+      "Don't lift content onto filled cards, dark-gray panels, or rounded containers.",
+      "Don't use offset, tinted or elevation drop shadows; only zero-offset black text halos.",
+      "Don't set labels in uppercase with wide tracking.",
+      "Don't hard-cut content at the viewport edges; let the progressive blur bands dissolve it."
+    ]
+  }
+}
