@@ -318,10 +318,10 @@
   /* ---------- media ---------- */
 
   function initMedia() {
-    if (!window.AsciiMedia) return;
-    $$('canvas[data-media]').forEach(function (cv) {
-      var mode = cv.getAttribute('data-media');
-      var Ctor = mode === 'ftc' && window.FtcMatch ? window.FtcMatch : window.AsciiMedia;
+    if (!window.WireObject) return;
+    $$('canvas[data-wire]').forEach(function (cv) {
+      var mode = cv.getAttribute('data-wire');
+      var Ctor = window.WireObject;
       var m = new Ctor(cv, mode, { fontFamily: MONO, theme: THEMES[currentTheme()] });
       m.setEnabled(motion);
       medias.push(m);
@@ -558,13 +558,82 @@
       .catch(function () { if (cached && cached.list) render(cached.list); else fail(); });
   })();
 
+  /* ---------- work pieces slide in and grow with the scroll ---------- */
+
+  (function () {
+    var pieces = $$('.work .piece');
+    if (!pieces.length) return;
+    var layout = [];
+    function measure() {
+      layout = pieces.map(function (el) {
+        var prev = el.style.transform;
+        el.style.transform = 'none';
+        var r = el.getBoundingClientRect();
+        el.style.transform = prev;
+        var mid = r.left + r.width / 2;
+        return { top: r.top + window.scrollY, side: mid < window.innerWidth / 2 ? -1 : 1 };
+      });
+    }
+    function apply() {
+      var vh = window.innerHeight, y = window.scrollY, still = reduceMQ.matches;
+      for (var i = 0; i < pieces.length; i++) {
+        var el = pieces[i], L = layout[i];
+        if (!L) continue;
+        if (still) { el.style.transform = ''; el.style.opacity = ''; continue; }
+        var p = (y + vh - L.top) / (vh * 0.7);
+        p = Math.max(0, Math.min(1, p));
+        var e = 1 - Math.pow(1 - p, 3);
+        var side = window.innerWidth < 720 ? (i % 2 ? 1 : -1) : L.side;
+        var tx = side * (1 - e) * Math.min(140, window.innerWidth * 0.09);
+        el.style.transform = 'translate3d(' + tx.toFixed(1) + 'px,' + ((1 - e) * 90).toFixed(1) + 'px,0) scale(' + (0.74 + 0.26 * e).toFixed(4) + ')';
+        el.style.opacity = (0.1 + 0.9 * e).toFixed(3);
+      }
+    }
+    var pending = false;
+    function onScroll() { if (!pending) { pending = true; requestAnimationFrame(function () { pending = false; apply(); }); } }
+    measure(); apply();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', function () { measure(); apply(); });
+    window.addEventListener('load', function () { measure(); apply(); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { measure(); apply(); });
+  })();
+
+  /* ---------- app downloads: point at the newest release's APK ---------- */
+
+  $$('[data-release]').forEach(function (a) {
+    var repo = a.getAttribute('data-release'), meta = $('[data-release-meta]', a);
+    var KEY = 'ncgg:release:' + repo, TTL = 60 * 60 * 1000;
+    function mb(n) { return (n / 1048576 >= 10 ? Math.round(n / 1048576) : (n / 1048576).toFixed(1)) + ' MB'; }
+    function apply(r) {
+      if (!r || !r.url) return;
+      a.href = r.url;
+      if (meta) meta.textContent = r.tag.replace(/^V/, 'v') + ' · ' + mb(r.size);
+      a.setAttribute('aria-label', 'Download ' + r.name + ' (Android, ' + mb(r.size) + ')');
+    }
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { cached = null; }
+    if (cached) apply(cached);
+    if (cached && Date.now() - cached.at < TTL) return;
+    fetch('https://api.github.com/repos/' + repo + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (rel) {
+        var apk = (rel.assets || []).filter(function (x) { return /\.apk$/i.test(x.name); })[0];
+        if (!apk) return;
+        var r = { at: Date.now(), url: apk.browser_download_url, name: apk.name, size: apk.size, tag: rel.tag_name || '' };
+        try { localStorage.setItem(KEY, JSON.stringify(r)); } catch (e) {}
+        apply(r);
+      })
+      .catch(function () {});
+  });
+
   /* ---------- photo drawer ---------- */
 
   function initDrawer(d) {
     if (!d || typeof d.showModal !== 'function') return;
     var opener = null;
     var items = $$('.gallery__item', d);
-    var viewer = $('.viewer', d);
+    // drawers without a photo grid (the sticker demo) get a stand-in viewer that never opens
+    var viewer = $('.viewer', d) || { hidden: true };
     var vImg = null, vCap = $('.viewer__caption', d);
     function ensureImg() {
       if (vImg) return vImg;
@@ -602,6 +671,7 @@
         viewer.hidden = true;
         d.showModal();
         root.classList.add('drawer-open');
+        d.dispatchEvent(new CustomEvent('drawer:open'));
         var first = $('[data-drawer-close]', d);
         if (first) first.focus();
       });
@@ -631,6 +701,13 @@
     });
   }
   $$('dialog.drawer').forEach(initDrawer);
+
+  /* ---------- hooks for the drive mode (game.js) ---------- */
+
+  window.NCGG = {
+    field: function () { return field; },
+    pauseMedia: function (paused) { medias.forEach(function (m) { m.setEnabled(!paused && motion); }); }
+  };
 
   /* ---------- boot after fonts ---------- */
 

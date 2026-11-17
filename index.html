@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@300..700&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20261118f">
   <script>
     document.documentElement.classList.add('js');
     try { if (localStorage.getItem('ncgg:theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
@@ -139,8 +139,8 @@
       </div>
 
       <div class="work__grid">
-        <figure class="piece piece--a" data-reveal>
-          <div class="piece__media"><canvas data-media="brush" aria-hidden="true"></canvas></div>
+        <figure class="piece piece--a">
+          <div class="piece__media"><canvas data-wire="yume" role="img" aria-label="Wireframe of a drawing tablet with a stylus and a brush stroke; it turns toward the cursor."></canvas></div>
           <figcaption>
             <h3>Yume <span class="piece__status">shipped · v1.2.4</span></h3>
             <p class="piece__meta">software · android · kotlin · compose</p>
@@ -149,12 +149,15 @@
               <a class="action" href="https://github.com/samncg/yume" target="_blank" rel="noopener">
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 11 11 5M6 5h5v5"/></svg><span>repo</span>
               </a>
+              <a class="action" href="https://github.com/samncg/yume/releases/latest" data-release="samncg/yume" rel="noopener">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg><span>download apk</span><span class="tag" data-release-meta>v1.2.4 · 3.9 MB</span>
+              </a>
             </p>
           </figcaption>
         </figure>
 
-        <figure class="piece piece--b" data-reveal>
-          <div class="piece__media"><canvas data-media="player" aria-hidden="true"></canvas></div>
+        <figure class="piece piece--b">
+          <div class="piece__media"><canvas data-wire="solace" role="img" aria-label="Wireframe of the Solace handheld player with its screen, knob and d-pad; it turns toward the cursor."></canvas></div>
           <figcaption>
             <h3>Solace <span class="piece__status">in progress</span></h3>
             <p class="piece__meta">hardware · cad · kicad · rp2350</p>
@@ -162,8 +165,8 @@
           </figcaption>
         </figure>
 
-        <figure class="piece piece--c" data-reveal>
-          <div class="piece__media"><canvas data-media="ledger" aria-hidden="true"></canvas></div>
+        <figure class="piece piece--c">
+          <div class="piece__media"><canvas data-wire="ledger" role="img" aria-label="Wireframe of a stack of coins with one coin on its edge; it turns toward the cursor."></canvas></div>
           <figcaption>
             <h3>Ledger <span class="piece__status">live · web + android</span></h3>
             <p class="piece__meta">software · react · vite · kotlin · compose</p>
@@ -172,6 +175,9 @@
               <a class="action" href="https://github.com/samncg/ledger-app" target="_blank" rel="noopener">
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 11 11 5M6 5h5v5"/></svg><span>repo</span>
               </a>
+              <a class="action" href="https://github.com/samncg/ledger-app/releases/latest" data-release="samncg/ledger-app" rel="noopener">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg><span>download apk</span><span class="tag" data-release-meta>v0.1.8 · 22 MB</span>
+              </a>
               <a class="action" href="https://samncg.github.io/ledger/" target="_blank" rel="noopener">
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 11 11 5M6 5h5v5"/></svg><span>try it</span>
               </a>
@@ -179,8 +185,8 @@
           </figcaption>
         </figure>
 
-        <figure class="piece piece--d" data-reveal>
-          <div class="piece__media"><canvas data-media="ftc" aria-label="Animation: a square robot collects three balls on its own side, lines up at the centre of the field and shoots them into the goal on the far side." role="img"></canvas></div>
+        <figure class="piece piece--d">
+          <div class="piece__media"><canvas data-wire="ftc" role="img" aria-label="Wireframe of the FTC robot with mecanum wheels, a turret and a ball; it turns toward the cursor."></canvas></div>
           <figcaption>
             <h3>FTC robot · team 27308 <span class="piece__status">finalist alliance award</span></h3>
             <p class="piece__meta">robotics · cad · 3d printing · java · FIRST Tech Challenge DECODE</p>
@@ -190,21 +196,31 @@
                 <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg>
                 <span>open photos · 8</span>
               </button>
+              <button class="action" type="button" data-drive aria-label="Drive the robot: W A S D to drive, space to shoot">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="6" y="2" width="4" height="4"/><rect x="2" y="9" width="4" height="4"/><rect x="6" y="9" width="4" height="4"/><rect x="10" y="9" width="4" height="4"/></svg>
+                <span>drive it</span><span class="tag tag--keys">wasd</span>
+              </button>
             </p>
           </figcaption>
         </figure>
 
-        <figure class="piece piece--e" data-reveal>
-          <div class="piece__media"><canvas data-media="halftone" aria-hidden="true"></canvas></div>
+        <figure class="piece piece--e">
+          <div class="piece__media"><canvas data-wire="cup" role="img" aria-label="Wireframe of a drink cup with a lid and straw; it turns toward the cursor."></canvas></div>
           <figcaption>
             <h3>Sticker auto-drawer <span class="piece__status">in progress</span></h3>
             <p class="piece__meta">software · image processing · adb</p>
             <p>Upload an image, tune brightness and contrast, and it draws the picture into the HeyTea app's custom sticker canvas over ADB, building tone from halftone dots, scanlines, outlines and eraser passes.</p>
+            <p class="piece__links">
+              <button class="action" type="button" data-drawer-open="sticker-demo" aria-haspopup="dialog">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z"/></svg>
+                <span>watch demo</span>
+              </button>
+            </p>
           </figcaption>
         </figure>
 
-        <figure class="piece piece--f" data-reveal>
-          <div class="piece__media"><canvas data-media="chat" aria-hidden="true"></canvas></div>
+        <figure class="piece piece--f">
+          <div class="piece__media"><canvas data-wire="nora" role="img" aria-label="Wireframe of a speech bubble with three typing dots; it turns toward the cursor."></canvas></div>
           <figcaption>
             <h3>Nora <span class="piece__status">self-hosted</span></h3>
             <p class="piece__meta">ai · local llm · gemma · llama.cpp · python · discord</p>
@@ -217,8 +233,8 @@
           </figcaption>
         </figure>
 
-        <figure class="piece piece--g" data-reveal>
-          <div class="piece__media"><canvas data-media="models" role="img" aria-label="Animation: three 3D-printed models turning on a turntable one after another: a handheld console shell, a phone case and a lattice water-bottle sleeve."></canvas></div>
+        <figure class="piece piece--g">
+          <div class="piece__media"><canvas data-wire="models" role="img" aria-label="Wireframes of a handheld console shell, a phone case and a lattice bottle sleeve, shown in turn; they turn toward the cursor."></canvas></div>
           <figcaption>
             <h3>3D models <span class="piece__status">modelled · printed</span></h3>
             <p class="piece__meta">3d modelling · cad · 3d printing</p>
@@ -263,6 +279,61 @@
             </span>
           </figcaption>
         </figure>
+      </div>
+    </dialog>
+
+    <!-- Sticker auto-drawer demo drawer -->
+    <dialog class="drawer drawer--wide" id="sticker-demo" aria-labelledby="sticker-demo-title">
+      <div class="drawer__panel">
+        <header class="drawer__head">
+          <h2 class="drawer__title" id="sticker-demo-title">Sticker auto-drawer <span class="drawer__sub">demo · brush + eraser sweep</span></h2>
+          <button class="action drawer__close" type="button" data-drawer-close>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg><span>close</span>
+          </button>
+        </header>
+        <div class="sdemo" data-sticker-demo>
+          <div class="sdemo__pair">
+            <figure class="sdemo__frame">
+              <div class="sdemo__paper">
+                <img data-sticker-src src="assets/sticker/source.jpg" width="640" height="605" decoding="async" alt="The source image: an anime character with messy dark-green hair, blue eyes and a pink mark on one cheek.">
+              </div>
+              <figcaption><span>original</span><span>640 × 605</span></figcaption>
+            </figure>
+            <figure class="sdemo__frame">
+              <div class="sdemo__paper">
+                <canvas data-sticker-canvas width="880" height="880" role="img" aria-label="The same image being redrawn on a white sticker canvas, row by row, with 6 px brush strokes and 8 px eraser sweeps."></canvas>
+                <span class="sdemo__pen" data-sticker-pen hidden></span>
+              </div>
+              <figcaption><span>sticker canvas</span><span data-sticker-count></span></figcaption>
+            </figure>
+          </div>
+          <div class="sdemo__bar">
+            <span class="sdemo__hud" data-sticker-hud>planning strokes…</span>
+            <button class="action" type="button" data-sticker-toggle hidden>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 4v8M10.5 4v8"/></svg><span>pause</span>
+            </button>
+          </div>
+          <div class="sdemo__notes">
+            <div class="sdemo__copy">
+              <h3>Why it takes several passes</h3>
+              <p>The smallest brush the HeyTea sticker canvas offers is <strong>6 px</strong>. That is too coarse to draw detail in one go: anything thinner than the brush tip, like an eyelid or a strand of hair, gets filled in.</p>
+              <p>So the drawer plans in passes. A brush pass lays down tone with 6 px strokes, then an 8 px eraser pass sweeps back over the same rows and carves the highlights and edges out of it. They alternate, each pass keeping only the strokes that bring the canvas closer to the image, until it stops improving or hits the pass limit. It works top to bottom in bands so each one settles before the next starts.</p>
+              <p class="sdemo__fine">This is the planner from the tool, running in your browser on the settings below. On the phone the same strokes are sent as swipes over ADB.</p>
+            </div>
+            <dl class="sdemo__settings">
+              <div><dt>style</dt><dd>pixel art: brush + eraser sweep (dithered)</dd></div>
+              <div><dt>canvas</dt><dd>880 × 880, rectangle, fit inside</dd></div>
+              <div><dt>brush</dt><dd>6 px <span>(app minimum)</span></dd></div>
+              <div><dt>eraser</dt><dd>8 px</dd></div>
+              <div><dt>passes</dt><dd>4 brush + 4 eraser</dd></div>
+              <div><dt>bands</dt><dd>5 (tiles per side)</dd></div>
+              <div><dt>brightness</dt><dd>+7</dd></div>
+              <div><dt>contrast</dt><dd>−55</dd></div>
+              <div><dt>midtones</dt><dd>114</dd></div>
+              <div><dt>smoothing</dt><dd>0</dd></div>
+            </dl>
+          </div>
+        </div>
       </div>
     </dialog>
 
@@ -337,9 +408,10 @@
     <a href="#top" data-scramble>back to top</a>
   </footer>
 
-  <script src="js/fluid.js"></script>
-  <script src="js/media.js"></script>
-  <script src="js/ftc.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/fluid.js?v=20261118f"></script>
+  <script src="js/wire.js?v=20261118f"></script>
+  <script src="js/main.js?v=20261118f"></script>
+  <script src="js/sticker.js?v=20261118f"></script>
+  <script src="js/game.js?v=20261118f"></script>
 </body>
 </html>
