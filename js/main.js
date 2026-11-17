@@ -112,7 +112,7 @@
 
   var THEMES = {
     dark: { bg: [0, 0, 0], ink: [1, 1, 1], meta: '#000000' },
-    light: { bg: [0.949, 0.949, 0.949], ink: [0.04, 0.04, 0.04], meta: '#f2f2f2', mark: true, field: 0.78, weight: 600 }
+    light: { bg: [0.949, 0.949, 0.949], ink: [0.04, 0.04, 0.04], meta: '#f2f2f2', mark: true, field: 1.3, floor: 0.32, weight: 600 }
   };
   var themeBtn = $('[data-theme-toggle]');
   var themeMeta = $('meta[name="theme-color"]');

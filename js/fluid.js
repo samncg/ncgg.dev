@@ -286,7 +286,7 @@
       var tt = t;
       var o = 0;
       var span = LUM_MAX - LUM_MIN;
-      var fieldK = theme.field || 1, strongMark = !!theme.mark;
+      var fieldK = theme.field || 1, strongMark = !!theme.mark, floor = theme.floor || 0;
 
       for (var j = 1; j <= rows; j++) {
         var py = (j - 0.5) * ch + py0;
@@ -332,7 +332,7 @@
             gi = Math.min(nR - 1, ((I - 0.07) / 0.93 * nR) | 0);
           }
           var lv = Math.pow(I, 0.8);
-          var strength = LUM_MIN + span * lv;
+          var strength = Math.max(LUM_MIN + span * lv, floor);
           if (mk > 0.3) {
             // the wordmark always prints in full ink with dense glyphs, even mid-stir
             strength = Math.max(strength, (strongMark ? 0.82 : 0.78) + 0.2 * mk);
