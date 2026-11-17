@@ -75,7 +75,7 @@
   var bot = null, balls = [], popups = [], score = 0, best = 0, spawnT = 0, cool = 0, hintT = 0;
   var clipped = [], rects = [], prevFocus = null, viaTouch = false, lastPointer = 'mouse', gustT = 0;
   var sBase = 100, fade = 1, timeLeft = MATCH, lastSec = -1, overT = 0, outroT = 0, outroTo = [0, 0], bestBefore = 0;
-  var vtMode = false, vtReady = false, matchEnd = 0, hiddenAt = 0, outroAt = 0;
+  var vtMode = false, vtReady = false, matchEnd = 0, hiddenAt = 0, outroAt = 0, toldShoot = false;
 
   /* ---------- projection (true isometric; (0,0) is the near corner, (N,N) the far one) ---------- */
 
@@ -342,6 +342,7 @@
         b.t += dt / 0.22;
         if (b.t >= 1) {
           b.dead = true; bot.held.push(b.c); updateHeld();
+          if (!toldShoot) { toldShoot = true; flashHint(viaTouch ? 'got one: drag shoot toward a glowing goal, let go to fire' : 'got one: aim at a glowing goal, space or click to fire'); }
           if (f) { var pi = P(bot.x, bot.y, 0.3); f.gust(pi[0], pi[1], 0, -3, 40); }
         }
         continue;
@@ -477,15 +478,47 @@
       [GH / 3, GH * 2 / 3].forEach(function (z) { seg([v[0][0], v[0][1], z], [v[k][0], v[k][1], z]); });
     });
     ctx.strokeStyle = rgba(p.ink, 0.5); ctx.lineWidth = lw; ctx.stroke();
-    // rim
+    // the opening: glows and pulses while the robot has something to shoot
+    var armed = bot.held.length > 0 && (state === 'on' || state === 'entering');
+    var beat = 0.5 + 0.5 * Math.sin(clock * 4.2);
     ctx.beginPath();
     path([[v[0][0], v[0][1], GH], [v[1][0], v[1][1], GH], [v[2][0], v[2][1], GH]], true);
-    ctx.strokeStyle = g.flash > 0 ? rgba(p.purple, 0.5 + 0.5 * g.flash) : rgba(p.ink, 0.85);
-    ctx.lineWidth = lw * (1.6 + g.flash * 1.6); ctx.stroke();
-    var t = P(g.mx, g.my, GH + 0.32);
-    ctx.font = Math.round(clamp(s * 0.1, 9, 11)) + 'px ' + MONO;
-    ctx.fillStyle = rgba(p.ink, 0.55); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('goal', t[0], t[1]);
+    ctx.fillStyle = rgba(p.purple, (armed ? 0.12 + 0.14 * beat : 0.06) + g.flash * 0.3); ctx.fill();
+    ctx.strokeStyle = g.flash > 0 ? rgba(p.purple, 0.5 + 0.5 * g.flash) : armed ? rgba(p.purple, 0.6 + 0.35 * beat) : rgba(p.ink, 0.85);
+    ctx.lineWidth = lw * (1.6 + g.flash * 1.6 + (armed ? 0.6 : 0)); ctx.stroke();
+    // chevrons dropping into the opening: where the ball goes
+    var w = clamp(0.13 * s, 7, 16);
+    ctx.lineWidth = lw * 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (var k = 0; k < 3; k++) {
+      var ph = (clock * 0.8 + k / 3) % 1, q = P(g.mx, g.my, GH + 1.0 - ph * 0.8);
+      var a = Math.sin(Math.PI * ph) * (armed ? 0.95 : 0.4);
+      ctx.beginPath();
+      ctx.moveTo(q[0] - w, q[1] - w * 0.6); ctx.lineTo(q[0], q[1]); ctx.lineTo(q[0] + w, q[1] - w * 0.6);
+      ctx.strokeStyle = armed ? rgba(p.purple, a) : rgba(p.ink, a); ctx.stroke();
+    }
+    var t = P(g.mx, g.my, GH + 1.25);
+    ctx.font = (armed ? '600 ' : '') + Math.round(clamp(s * 0.1, 10, 12)) + 'px ' + MONO;
+    ctx.fillStyle = armed ? rgba(p.purple, 0.95) : rgba(p.ink, 0.6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(armed ? 'shoot here' : 'goal', t[0], t[1]);
+  }
+  // when the field is bigger than the screen (phones), point at goals that are out of view
+  function drawGoalArrows(p) {
+    if (state !== 'on' && state !== 'entering') return;
+    var armed = bot.held.length > 0, m = 30, top = 120, bottom = viaTouch ? 200 : 60;
+    GOALS.forEach(function (g) {
+      var q = P(g.mx, g.my, GH);
+      if (q[0] > m && q[0] < W - m && q[1] > top && q[1] < H - bottom) return;
+      var x = clamp(q[0], m, W - m), y = clamp(q[1], top, H - bottom);
+      var a = Math.atan2(q[1] - y, q[0] - x);
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(a);
+      ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-6, -8); ctx.lineTo(-2, 0); ctx.lineTo(-6, 8); ctx.closePath();
+      ctx.fillStyle = armed ? rgba(p.purple, 0.95) : rgba(p.ink, 0.7); ctx.fill();
+      ctx.restore();
+      ctx.font = '11px ' + MONO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = armed ? rgba(p.purple, 0.95) : rgba(p.ink, 0.7);
+      ctx.fillText('goal', x - Math.cos(a) * 24, y - Math.sin(a) * 18);
+    });
   }
   function drawShadow(x, y, z, r, p, a) {
     var q = P(x, y, 0), k = 1 / (1 + z * 0.7);
@@ -618,6 +651,7 @@
     items.forEach(function (it) { it.f(); });
     drawWalls(p, lw, true);
     drawAim(p, lw);
+    drawGoalArrows(p);
     popups.forEach(function (pp) {
       var q = P(pp.x, pp.y, pp.z + pp.t * 0.7);
       ctx.font = '600 ' + Math.round(clamp(s * 0.2, 14, 22)) + 'px ' + MONO;
@@ -814,7 +848,7 @@
     hud.n.textContent = '00';
     hud.best.textContent = 'best ' + pad2(best);
     GOALS.forEach(function (g) { g.flash = 0; });
-    bestBefore = best;
+    bestBefore = best; toldShoot = false;
     timeLeft = MATCH; lastSec = -1; overT = 0; outroT = 0; fade = 1;
     hud.time.textContent = fmt(MATCH);
     hud.time.classList.remove('is-low');
@@ -870,7 +904,7 @@
     maxR = Math.hypot(Math.max(pulseX, W - pulseX), Math.max(pulseY, H - pulseY)) + 60;
     clipped = Array.prototype.slice.call(document.querySelectorAll(CLIP));
     root.classList.add('game-run');
-    flashHint(viaTouch ? 'stick to drive · drag shoot to aim, let go to fire' : 'wasd to drive · aim with the cursor · space or click to shoot · esc to exit');
+    flashHint(viaTouch ? 'stick to drive · pick up artifacts · drag shoot toward a goal, let go' : 'wasd to drive · pick up artifacts · aim at a goal · space or click to shoot');
     hintT = 6;
     var f = fluid();
     if (f) { f.setDim(0.9); f.burst(pulseX, pulseY, reduce.matches ? 6 : 24); }
