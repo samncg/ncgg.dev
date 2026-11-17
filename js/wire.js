@@ -435,8 +435,8 @@
     seg(tur, [-0.21, 0.48, 0.28], [-0.21, 0.42, -0.14]); seg(tur, [-0.21, 0.36, 0.28], [-0.21, 0.3, -0.14]);
     // flywheel stack at the front, blue roller at the back, three rods
     var fw = new Geo();
-    cyl(fw, 0, 0, 0, 0.12, 0.12, 0.34, 18, 'x', 3, spin * 3);
-    for (var d = 0; d < 6; d++) loop(fw, ringPts(-0.15 + d * 0.06, 0, 0, 0.12, 18, 'x', spin * 3));
+    cyl(fw, 0, 0, 0, 0.12, 0.12, 0.34, 18, 'x', 3, -spin * 3); // flywheel spins up and out toward the shot
+    for (var d = 0; d < 6; d++) loop(fw, ringPts(-0.15 + d * 0.06, 0, 0, 0.12, 18, 'x', -spin * 3));
     tur.merge(fw, move(0, 0.4, -0.14));
     cyl(tur, 0, 0.46, 0.3, 0.055, 0.055, 0.36, 12, 'x', 4, spin);
     [0.27, 0.31, 0.35].forEach(function (ry) { seg(tur, [-0.2, ry, -0.27], [0.2, ry, -0.27]); });
