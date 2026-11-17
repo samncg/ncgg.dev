@@ -1,5 +1,5 @@
 /*
- * AsciiMedia — small generative ASCII pieces that stand in for project media.
+ * AsciiMedia: small generative ASCII pieces that stand in for project media.
  * Each mode returns an intensity per cell (0..1), with optional text overlays.
  */
 (function () {
@@ -243,7 +243,7 @@
   };
 
   MODES.ledger = function () {
-    // Left: today's allowance and the log. Right: this month — a donut of spending by
+    // Left: today's allowance and the log. Right: this month, a donut of spending by
     // category with the money left in the middle, and a legend.
     var CATS = [['food', '#', 0.95], ['transport', '%', 0.72], ['study', '*', 0.85], ['fun', '+', 0.6], ['other', '=', 0.5]];
     var ITEMS = [['coffee', 4.5, 0], ['bus', 1.2, 1], ['lunch', 8, 0], ['books', 12.9, 2], ['snacks', 3.1, 0],

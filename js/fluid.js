@@ -1,5 +1,5 @@
 /*
- * AsciiField — a stable-fluids solver rendered as gray ASCII glyphs.
+ * AsciiField: a stable-fluids solver rendered as gray ASCII glyphs.
  * Velocity is stored in CSS pixels per frame on a grid of character cells.
  * The hero wordmark is a mask that the flow displaces and that springs back.
  */
@@ -234,10 +234,10 @@
         d[k] *= 0.972;
         u[k] *= 0.986;
         v[k] *= 0.986;
-        var nx = (ox[k] + u[k] * 0.5) * 0.88;
-        var ny = (oy[k] + v[k] * 0.5) * 0.88;
-        ox[k] = nx > 90 ? 90 : nx < -90 ? -90 : nx;
-        oy[k] = ny > 90 ? 90 : ny < -90 ? -90 : ny;
+        var nx = (ox[k] + u[k] * 0.16) * 0.84;
+        var ny = (oy[k] + v[k] * 0.16) * 0.84;
+        ox[k] = nx > 28 ? 28 : nx < -28 ? -28 : nx;
+        oy[k] = ny > 28 ? 28 : ny < -28 ? -28 : ny;
       }
     }
 
@@ -305,7 +305,7 @@
 
           var dk = d[k];
           if (dk > 1.4) dk = 1.4;
-          I += dk * 0.62;
+          I += dk * 0.5;
 
           var mk = 0;
           if (mask) {
@@ -325,7 +325,7 @@
           if (I > 1) I = 1;
 
           var gi;
-          if (sp > 2.2 && I > 0.16) {
+          if (sp > 2.2 && I > 0.16 && mk < 0.3) {
             var ang = Math.atan2(vk, uk);
             gi = nR + (((Math.round(ang / (Math.PI / 4)) % 4) + 4) % 4);
           } else {
@@ -333,14 +333,23 @@
           }
           var lv = Math.pow(I, 0.8);
           var strength = LUM_MIN + span * lv;
-          if (strongMark && mk > 0.3) {
-            // light theme: the wordmark prints in full ink with dense glyphs
-            strength = Math.max(strength, 0.82 + 0.18 * mk);
+          if (mk > 0.3) {
+            // the wordmark always prints in full ink with dense glyphs, even mid-stir
+            strength = Math.max(strength, (strongMark ? 0.82 : 0.78) + 0.2 * mk);
             if (gi < nR) gi = Math.max(gi, nR - 3);
           }
+          // thermal: fast flow warms from purple towards orange; gentle, and kept off the wordmark
+          var heat = sp > 4 ? Math.min(1, (sp - 4) / 30) : 0;
+          heat *= 1 - 0.85 * Math.min(1, mk * 1.4);
+          if (heat > 0) strength = Math.max(strength, 0.32 + 0.4 * heat);
+          // faint purple glow along the wave contours (not on the wordmark or stirred ink)
+          var tint = contour * (1 - Math.min(1, mk * 1.5)) * Math.max(0, 1 - dk * 2);
+          if (tint > 0.05) strength = Math.max(strength, LUM_MIN + 0.24 * tint * dim);
           if (gl) {
             cells[o] = gi + 1;
             cells[o + 1] = Math.round(Math.min(1, strength) * 255);
+            cells[o + 2] = Math.round(heat * 255);
+            cells[o + 3] = Math.round(tint * 255);
           } else {
             var li = Math.min(LEVELS - 1, ((strength - LUM_MIN) / span * LEVELS) | 0);
             ctx.drawImage(atlas, gi * acw, li * ach, acw, ach,
@@ -359,7 +368,8 @@
       var fs = [
         'precision mediump float;',
         'uniform sampler2D uCells;uniform sampler2D uAtlas;',
-        'uniform vec2 uGrid;uniform vec2 uCell;uniform float uH;uniform float uGlyphs;uniform vec3 uBg;uniform vec3 uInk;',
+        'uniform vec2 uGrid;uniform vec2 uCell;uniform float uH;uniform float uGlyphs;uniform vec3 uBg;uniform vec3 uInk;uniform float uLight;',
+        'vec3 thermal(float h){vec3 c=mix(vec3(.32,.07,.52),vec3(.82,.13,.38),smoothstep(0.,.32,h));c=mix(c,vec3(.98,.42,.08),smoothstep(.28,.6,h));c=mix(c,vec3(1.,.8,.22),smoothstep(.56,.84,h));c=mix(c,vec3(1.,.97,.86),smoothstep(.84,1.,h)*(1.-uLight));return c*(1.-.18*uLight);}',
         'void main(){',
         ' vec2 px=vec2(gl_FragCoord.x,uH-gl_FragCoord.y);',
         ' vec2 cell=floor(px/uCell);',
@@ -369,7 +379,10 @@
         ' float g=floor(c.r*255.+.5);',
         ' if(g<.5){gl_FragColor=vec4(uBg,1.);return;}',
         ' float a=texture2D(uAtlas,vec2((g-1.+f.x)/uGlyphs,f.y)).a;',
-        ' gl_FragColor=vec4(mix(uBg,uInk,c.g*a),1.);',
+        ' vec3 purple=mix(vec3(.62,.45,1.),vec3(.45,.25,.85),uLight);',
+        ' vec3 ink=mix(uInk,purple,c.a*.92);',
+        ' ink=mix(ink,thermal(c.b),smoothstep(0.,.25,c.b)*.75);',
+        ' gl_FragColor=vec4(mix(uBg,ink,c.g*a),1.);',
         '}'
       ].join('\n');
       function sh(type, src) {
@@ -408,7 +421,8 @@
         uH: gl.getUniformLocation(prog, 'uH'),
         uGlyphs: gl.getUniformLocation(prog, 'uGlyphs'),
         uBg: gl.getUniformLocation(prog, 'uBg'),
-        uInk: gl.getUniformLocation(prog, 'uInk')
+        uInk: gl.getUniformLocation(prog, 'uInk'),
+        uLight: gl.getUniformLocation(prog, 'uLight')
       };
       gl.uniform1i(gl.getUniformLocation(prog, 'uCells'), 0);
       gl.uniform1i(gl.getUniformLocation(prog, 'uAtlas'), 1);
@@ -435,6 +449,7 @@
       if (!glr) return;
       gl.uniform3f(glr.uBg, theme.bg[0], theme.bg[1], theme.bg[2]);
       gl.uniform3f(glr.uInk, theme.ink[0], theme.ink[1], theme.ink[2]);
+      gl.uniform1f(glr.uLight, theme.bg[0] > 0.5 ? 1 : 0);
     }
 
     function glPresent() {

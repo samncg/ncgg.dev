@@ -2,7 +2,7 @@
   'use strict';
 
   /* ------------------------------------------------------------------
-   * EDIT ME — your contact details.
+   * EDIT ME: your contact details.
    * ------------------------------------------------------------------ */
   // Set `emailPlaceholder` to false once `email` is your real address;
   // that removes the visible "placeholder" mark under it.
@@ -543,11 +543,13 @@
               return { repo: r.name, sha: c.sha.slice(0, 7), msg: (c.commit.message || '').split('\n')[0],
                 date: (c.commit.author || c.commit.committer || {}).date, url: c.html_url };
             });
-          }, function () { return []; });
+          }, function () { return null; });
         }));
       })
       .then(function (groups) {
-        var list = [].concat.apply([], groups).filter(function (c) { return c.date; });
+        var failed = groups.some(function (g) { return g === null; });
+        var list = [].concat.apply([], groups.filter(Boolean)).filter(function (c) { return c.date; });
+        if (!list.length && failed) throw new Error('rate limited');
         list.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
         list = list.slice(0, 4);
         try { localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), list: list })); } catch (e) {}

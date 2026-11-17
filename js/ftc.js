@@ -1,5 +1,5 @@
 /*
- * FtcMatch — a small isometric vector scene of an FTC DECODE-style match:
+ * FtcMatch: a small isometric vector scene of an FTC DECODE-style match:
  * a square robot collects three balls on its own side, lines up at the centre
  * of the field, turns its turret and shoots them into the goal in the far corner.
  * Same control surface as AsciiMedia: setVisible / setEnabled / setHover / setTheme / resize.
