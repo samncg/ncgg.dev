@@ -17,7 +17,7 @@ Connect this repo in Cloudflare Pages and use:
 | Setting | Value |
 |---|---|
 | Framework preset | None |
-| Build command | `mkdir -p dist && cp -r index.html favicon.svg css js assets dist/` |
+| Build command | `mkdir -p dist && cp -r index.html favicon.svg css js assets sticker dist/` |
 | Build output directory | `dist` |
 
 The build step copies only the site into `dist/`, so the design notes in the repo root (`PRODUCT.md`, `DESIGN.md`, `.impeccable/`) are never served. Add `ncgg.dev` under **Custom domains** once the first deploy succeeds.

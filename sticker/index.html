@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sticker drawer · ncgg.dev</title>
+  <meta name="description" content="Turn a picture into a drawing for the HeyTea custom sticker canvas, then let your phone draw it over ADB.">
+  <meta name="theme-color" content="#000000">
+  <meta name="color-scheme" content="dark light">
+  <meta property="og:title" content="Sticker drawer">
+  <meta property="og:description" content="Turn a picture into a HeyTea sticker your phone draws by itself.">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@300..700&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap">
+  <link rel="stylesheet" href="sticker.css?v=3">
+  <script>
+    try { if (localStorage.getItem('ncgg:theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  </script>
+</head>
+<body>
+  <header class="top">
+    <a class="top__home" href="../">ncgg.dev</a>
+    <span class="top__crumb" aria-hidden="true">/</span>
+    <span class="top__name">sticker drawer</span>
+    <button class="btn btn--ghost top__theme" type="button" data-theme-toggle aria-label="Switch colour theme"><span data-theme-label>light</span></button>
+  </header>
+
+  <main class="app">
+    <section class="intro">
+      <h1>Sticker drawer</h1>
+      <p>Turn any picture into a drawing for the HeyTea custom sticker canvas, then let your phone draw it by itself over ADB. Drop an image and it picks the settings that come out closest to it.</p>
+      <ol class="crumbs" aria-label="Steps">
+        <li><a href="#step-image"><span>01</span>image</a></li>
+        <li><a href="#step-style"><span>02</span>style</a></li>
+        <li><a href="#step-phone"><span>03</span>phone</a></li>
+        <li><a href="#step-draw"><span>04</span>draw</a></li>
+      </ol>
+    </section>
+
+    <div class="layout">
+      <aside class="stage" aria-label="Preview">
+        <div class="stage__pair">
+          <figure class="view">
+            <div class="paper" data-shape>
+              <canvas id="src-view" width="880" height="880" role="img" aria-label="Your image, fitted to the sticker canvas"></canvas>
+              <div class="paper__empty" data-empty>your image</div>
+            </div>
+            <figcaption>
+              <span id="src-label">your image</span>
+              <button class="link" type="button" id="toggle-adjusted" hidden>show adjusted</button>
+            </figcaption>
+          </figure>
+          <figure class="view">
+            <div class="paper" data-shape>
+              <canvas id="draw-view" width="880" height="880" role="img" aria-label="Preview of the drawing on the sticker canvas"></canvas>
+              <span class="pen" id="pen" hidden></span>
+              <div class="paper__busy" id="busy" hidden><span class="busy__bar"><i id="busy-bar"></i></span><span id="busy-text">finding the closest settings</span></div>
+              <div class="paper__empty" data-empty>drawing</div>
+            </div>
+            <figcaption><span>drawing</span><span class="match" id="match"></span></figcaption>
+          </figure>
+        </div>
+        <div class="stage__bar">
+          <span class="stats" id="stats" aria-live="polite">Add an image to start.</span>
+          <span class="stage__btns">
+            <button class="btn" type="button" id="replay" disabled>replay</button>
+            <button class="btn" type="button" id="finish" disabled>finish</button>
+          </span>
+        </div>
+      </aside>
+
+      <div class="flow">
+        <section class="step" id="step-image" aria-labelledby="h-image">
+          <h2 id="h-image"><span>01</span>Image</h2>
+          <label class="drop" id="drop">
+            <input type="file" id="file" accept="image/*">
+            <span class="drop__main">Drop an image here, paste one, or <u>choose a file</u></span>
+            <span class="drop__sub">PNG, JPG or WebP. It never leaves your device.</span>
+          </label>
+          <div class="loaded" id="loaded" hidden>
+            <span class="loaded__thumb" id="thumb" aria-hidden="true"></span>
+            <span class="loaded__name" id="file-name"></span>
+            <label class="btn" for="file">change</label>
+          </div>
+          <p class="hint">No picture handy? <button class="link" type="button" id="sample">Try the sample</button></p>
+        </section>
+
+        <section class="step" id="step-style" aria-labelledby="h-style">
+          <h2 id="h-style"><span>02</span>Style</h2>
+          <div class="auto" id="auto" hidden>
+            <p class="auto__line"><span class="auto__k">auto-matched</span> <strong id="auto-style"></strong> <span id="auto-match"></span></p>
+            <p class="hint">Pixel sweep was drawn over and over with different cut-offs and tones and compared with your image; these settings came out closest. Change anything below to taste.</p>
+            <button class="btn" type="button" id="rematch">match again</button>
+          </div>
+          <fieldset class="styles">
+            <legend class="sr-only">Drawing style</legend>
+            <div id="style-list"></div>
+          </fieldset>
+          <div class="group">
+            <h3>Tone</h3>
+            <div id="tone"></div>
+          </div>
+          <div class="group" id="style-group">
+            <h3>This style</h3>
+            <div id="style-controls"></div>
+          </div>
+          <details class="more">
+            <summary>More controls</summary>
+            <div id="more-controls"></div>
+          </details>
+        </section>
+
+        <section class="step" id="step-phone" aria-labelledby="h-phone">
+          <h2 id="h-phone"><span>03</span>Your phone</h2>
+          <p class="hint">On the phone, turn on <b>Developer options</b>, <b>USB debugging</b> and <b>Pointer location</b>. Open the custom sticker canvas in HeyTea and note where its edges are on screen, in pixels. These are saved on this device.</p>
+          <div class="fields fields--4" id="canvas-fields"></div>
+          <div class="fields fields--2" id="tool-size-fields"></div>
+          <div class="fields fields--2" id="method-fields"></div>
+          <details class="more" id="tools-more">
+            <summary>Eraser and pen buttons <span class="more__note" id="eraser-note"></span></summary>
+            <p class="hint">Where the eraser and pen buttons are, so the script can switch tools by itself. Leave them at 0 to switch by hand when the script asks.</p>
+            <div class="fields fields--4" id="tool-fields"></div>
+            <div class="fields fields--2" id="tool-extra"></div>
+          </details>
+          <details class="more" id="fast-more" hidden>
+            <summary>Fast mode: raw touch device</summary>
+            <p class="hint">From <code>adb shell getevent -lp</code>: the touchscreen device and its maximum X and Y.</p>
+            <div class="fields fields--3" id="fast-fields"></div>
+          </details>
+        </section>
+
+        <section class="step" id="step-draw" aria-labelledby="h-draw">
+          <h2 id="h-draw"><span>04</span>Draw it</h2>
+          <p class="summary" id="summary">Add an image first.</p>
+          <div class="actions">
+            <button class="btn btn--primary" type="button" id="download" disabled>download draw.sh</button>
+            <button class="btn" type="button" id="copy" disabled>copy script</button>
+            <button class="btn" type="button" id="test">tool switch test</button>
+          </div>
+          <ol class="howto">
+            <li>Connect the phone with USB debugging on, then send the script:
+              <div class="cmd"><code>adb push draw.sh /sdcard/</code><button class="link" type="button" data-copy-cmd>copy</button></div></li>
+            <li>Open the custom sticker canvas in HeyTea, pick the black pen, and keep the screen on.</li>
+            <li>Start drawing:
+              <div class="cmd"><code>adb shell sh /sdcard/draw.sh</code><button class="link" type="button" data-copy-cmd>copy</button></div></li>
+            <li>To stop early, press Ctrl+C in the terminal.</li>
+          </ol>
+          <details class="more">
+            <summary>View the script</summary>
+            <textarea id="script" readonly spellcheck="false" aria-label="Generated script"></textarea>
+          </details>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <a href="../#work">back to ncgg.dev</a>
+    <span>runs entirely in your browser</span>
+  </footer>
+
+  <script src="engine.js?v=33"></script>
+  <script src="app.js?v=13"></script>
+</body>
+</html>
