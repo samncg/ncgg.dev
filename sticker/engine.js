@@ -1189,19 +1189,35 @@
     });
   }
   // Ph: phone settings { rx, ry, rw, rh, method: 'sw'|'mo'|'fe', dur, ex, ey, tx, ty, ex2, tx2, sd, pt, tdev, mx, my, scw, sch, mc }
+  /*
+   * Every line is drawn there and back. HeyTea smooths a stroke through the midpoints between touch events, so
+   * when the finger lifts the last stretch is never drawn: a 40 ms swipe loses about a third of its length at
+   * the end (measured 87 px of 252), a slower one less. Each pass starts in exactly the right place, and the
+   * return pass starts where the first one's tail went missing, so together they cover the whole line.
+   * Taps (dots) are drawn whole and stay single.
+   */
   function script(strokes, W, H, Ph) {
     function X(p) { return Math.round(Ph.rx + (p[0] + 0.5) / W * Ph.rw); }
     function Y(p) { return Math.round(Ph.ry + (p[1] + 0.5) / H * Ph.rh); }
-    var L = HEAD.concat(['# HeyTea sticker auto-draw: ' + strokes.length + ' strokes']), tool = 0, sid = 0;
+    function swipe(a, b) { L.push('input swipe ' + X(a) + ' ' + Y(a) + ' ' + X(b) + ' ' + Y(b) + ' ' + Ph.dur); }
+    function motion(q) {
+      L.push('input motionevent DOWN ' + X(q[0]) + ' ' + Y(q[0]));
+      for (var i = 1; i < q.length; i++) L.push('input motionevent MOVE ' + X(q[i]) + ' ' + Y(q[i]));
+      L.push('input motionevent UP ' + X(q[q.length - 1]) + ' ' + Y(q[q.length - 1]));
+    }
+    var L = HEAD.concat(['# HeyTea sticker auto-draw: ' + strokes.length + ' strokes, each line there and back']), tool = 0, sid = 0;
     strokes.forEach(function (p) {
-      var e = p[p.length - 1], t = p.er ? 1 : 0;
+      var t = p.er ? 1 : 0, back = p.slice().reverse(), moves = p.some(function (q) { return X(q) !== X(p[0]) || Y(q) !== Y(p[0]); });
       if (t !== tool) { tool = t; toolSwitch(t, L, Ph); }
-      if (Ph.method === 'fe') fstroke(L, fpts(p, W, H, Ph), (sid++) % 60000 + 1, Ph);
-      else if (Ph.method === 'mo') {
-        L.push('input motionevent DOWN ' + X(p[0]) + ' ' + Y(p[0]));
-        for (var i = 1; i < p.length; i++) L.push('input motionevent MOVE ' + X(p[i]) + ' ' + Y(p[i]));
-        L.push('input motionevent UP ' + X(e) + ' ' + Y(e));
-      } else for (var j = 1; j < p.length; j++) L.push('input swipe ' + X(p[j - 1]) + ' ' + Y(p[j - 1]) + ' ' + X(p[j]) + ' ' + Y(p[j]) + ' ' + Ph.dur);
+      if (Ph.method === 'fe') {
+        fstroke(L, fpts(p, W, H, Ph), (sid++) % 60000 + 1, Ph);
+        if (moves) fstroke(L, fpts(back, W, H, Ph), (sid++) % 60000 + 1, Ph);
+      } else if (Ph.method === 'mo') { motion(p); if (moves) motion(back); }
+      else if (p.length === 1) swipe(p[0], p[0]);
+      else for (var j = 1; j < p.length; j++) {
+        swipe(p[j - 1], p[j]);
+        if (X(p[j - 1]) !== X(p[j]) || Y(p[j - 1]) !== Y(p[j])) swipe(p[j], p[j - 1]);
+      }
     });
     return sh(L);
   }
@@ -1210,7 +1226,11 @@
     var L = HEAD.concat(['# Tool switch test: pen line, eraser gap, pen line']);
     function go(y, a, b) {
       if (Ph.method === 'fe') fstroke(L, fpts([[a * W - 0.5, y * H - 0.5], [b * W - 0.5, y * H - 0.5]], W, H, Ph), 1, Ph);
-      else L.push('input swipe ' + Math.round(Ph.rx + Ph.rw * a) + ' ' + Math.round(Ph.ry + Ph.rh * y) + ' ' + Math.round(Ph.rx + Ph.rw * b) + ' ' + Math.round(Ph.ry + Ph.rh * y) + ' 400');
+      else {
+        var ya = Math.round(Ph.ry + Ph.rh * y), xa = Math.round(Ph.rx + Ph.rw * a), xb = Math.round(Ph.rx + Ph.rw * b);
+        // there and back, like the drawing (HeyTea cuts the end off a stroke)
+        L.push('input swipe ' + xa + ' ' + ya + ' ' + xb + ' ' + ya + ' 400', 'input swipe ' + xb + ' ' + ya + ' ' + xa + ' ' + ya + ' 400');
+      }
     }
     L.push('echo "pen line 1"'); go(0.3, 0.1, 0.9);
     toolSwitch(1, L, Ph); L.push('echo "eraser gap"'); go(0.3, 0.4, 0.6);
