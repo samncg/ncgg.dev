@@ -984,7 +984,7 @@
       if (st >= 0) out.push([st, last]);
       return out;
     }
-    var best = null;
+    var cands = [];
     groups.forEach(function (q) {
       // mc: the canvas colour; mi: ink (anything clearly darker), which counts on a light canvas only when growing its edges
       var c = q.c, lum = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2], light = lum > 150, mc = new Uint8Array(W * H), mi = new Uint8Array(W * H), rowC = new Uint32Array(H);
@@ -1024,9 +1024,28 @@
                 if (frac(horiz, t, a, b2, true) < 0.5) break;
                 if (frac(horiz, t, a, b2) >= 0.003) { ok = t; break; }
               }
-              if (ok < 0) return v;
+              if (ok < 0) {
+                // a band of solid ink at the edge (a drawing that reaches it) is crossed only when a light line
+                // that is not canvas, like the frame, ends it within a quarter of the canvas; a dark page doesn't
+                var cap = Math.round(0.25 * (b2 - a + 1)), u = v + d, n2 = 0;
+                while (n2 < cap && u >= 0 && u <= lim && frac(horiz, u, a, b2, true) >= 0.5 && frac(horiz, u, a, b2) < 0.003) { u += d; n2++; }
+                if (n2 > 0 && n2 < cap && u >= 0 && u <= lim) {
+                  if (frac(horiz, u, a, b2, true) >= 0.5) { v = u; continue; }          // canvas again past the band
+                  if (lightFrac(horiz, u, a, b2) >= 0.5) { v = u - d; continue; }     // the frame ends it
+                }
+                return v;
+              }
               v = ok;
             }
+          }
+          function lightFrac(horiz, v, a, b2) {
+            var hit = 0, tot = 0;
+            for (var u = a; u <= b2; u++) {
+              var p = horiz ? v * W + u : u * W + v, k2 = p * 4;
+              tot++;
+              if (!mc[p] && 0.299 * data[k2] + 0.587 * data[k2 + 1] + 0.114 * data[k2 + 2] >= lum - 30) hit++;
+            }
+            return hit / Math.max(1, tot);
           }
           for (var pass = 0; pass < 2; pass++) {
             y0 = grow(true, y0, -1, x0, x1, H - 1); y1 = grow(true, y1, 1, x0, x1, H - 1);
@@ -1055,9 +1074,16 @@
           corner /= 4 * cs * cs;
           var score = area * edge * (touch ? 0.4 : 1);
           if (debug) debug({ colour: c.map(Math.round), x: x0, y: y0, w: wid, h: h, edge: edge, out: sides ? out / sides : null, score: score / (W * H) });
-          if (!best || score > best.score) best = { x: x0, y: y0, w: wid, h: h, shape: corner < 0.15 && edge > 0.5 ? 'circle' : 'rect', colour: c.map(Math.round), score: score };
+          cands.push({ x: x0, y: y0, w: wid, h: h, shape: corner < 0.15 && edge > 0.5 ? 'circle' : 'rect', colour: c.map(Math.round), score: score });
         });
       });
+    });
+    // a region lying inside another candidate is something drawn on that canvas, not the canvas
+    function inside(a, b) { return a !== b && a.x >= b.x - 2 && a.y >= b.y - 2 && a.x + a.w <= b.x + b.w + 2 && a.y + a.h <= b.y + b.h + 2 && (a.w < b.w - 4 || a.h < b.h - 4 || a.colour.join() !== b.colour.join()); }
+    var best = null;
+    cands.forEach(function (a) {
+      if (cands.some(function (b) { return inside(a, b); })) return;
+      if (!best || a.score > best.score) best = a;
     });
     if (best) best.score = Math.round(best.score / (W * H) * 1000) / 1000;
     return best;
