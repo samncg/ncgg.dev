@@ -341,21 +341,38 @@ main { overflow-x: clip; }
 
 /* ---------- practice ---------- */
 
-.practice .display { grid-column: 1 / -1; margin-bottom: clamp(36px, 6vw, 72px); text-align: right; }
-.disciplines { grid-column: 2 / -1; border-top: 1px solid var(--line-2); }
+.practice .display { grid-column: 1 / -1; margin-bottom: clamp(36px, 6vw, 72px); text-align: right; position: relative; z-index: 1; }
+.disciplines { grid-column: 2 / span 10; position: relative; isolation: isolate; }
+/* the rules between rows fade out at both ends, so the list has no hard frame */
+.disciplines::before, .discipline::after {
+  content: ""; position: absolute; left: 0; right: 0; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--line-2) 16%, var(--line-2) 84%, transparent);
+}
+.disciplines::before { top: 0; }
+.discipline::after { bottom: 0; }
+/* one soft blur behind the whole list, like the Work cards: no edge on any side.
+   A single mask image (a blurred rectangle) does the fade: Chrome drops two composited masks on a backdrop blur. */
+.disciplines::after {
+  content: ""; position: absolute; z-index: -1; inset: -36px calc(-1 * var(--gut)); pointer-events: none;
+  background: rgb(var(--bg-rgb) / 0.5);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cfilter id='f' x='-20%25' y='-20%25' width='140%25' height='140%25'%3E%3CfeGaussianBlur stdDeviation='1.6 2.2'/%3E%3C/filter%3E%3Crect x='4' y='5.5' width='92' height='89' filter='url(%23f)'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cfilter id='f' x='-20%25' y='-20%25' width='140%25' height='140%25'%3E%3CfeGaussianBlur stdDeviation='1.6 2.2'/%3E%3C/filter%3E%3Crect x='4' y='5.5' width='92' height='89' filter='url(%23f)'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
 .discipline {
   position: relative;
   display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr) auto;
   align-items: baseline; gap: 12px 32px;
   padding: clamp(18px, 2.4vw, 30px) 0;
-  border-bottom: 1px solid var(--line-2);
   isolation: isolate;
 }
+/* hover: a little more veil behind the row, as a soft ellipse */
 .discipline::before {
-  content: ""; position: absolute; inset: 0 -12px; z-index: -1;
-  background: rgb(var(--bg-rgb) / 0.72);
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  opacity: 0.6;
+  content: ""; position: absolute; inset: -30px -8%; z-index: -1; pointer-events: none;
+  background: rgb(var(--bg-rgb) / 0.55);
+  mask: radial-gradient(closest-side, #000 40%, rgb(0 0 0 / 0.6) 65%, rgb(0 0 0 / 0.2) 85%, transparent);
+  -webkit-mask: radial-gradient(closest-side, #000 40%, rgb(0 0 0 / 0.6) 65%, rgb(0 0 0 / 0.2) 85%, transparent);
+  opacity: 0;
   transition: opacity 0.5s var(--ease);
 }
 .discipline h3 {
