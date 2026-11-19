@@ -19,6 +19,8 @@
 .finder__note { font-size: var(--step--1); color: var(--fg-2); }
 .finder__view { grid-column: 1 / -1; justify-self: start; max-height: 320px; max-width: 100%; width: auto; height: auto; }
 .finder__view[hidden] { display: none; }
+.warn { padding: 10px 12px; border-left: 2px solid #ff2d55; color: var(--fg); font-size: var(--step--1); line-height: 1.6; }
+.warn[hidden] { display: none; }
 .fitrow__k { font-size: 0.75rem; color: var(--fg-3); letter-spacing: 0.06em; text-transform: uppercase; }
 :root {
   --bg: #000; --bg-rgb: 0 0 0;

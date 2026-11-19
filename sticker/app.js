@@ -188,7 +188,8 @@
     im.onload = function () {
       var W = im.naturalWidth, H = im.naturalHeight, c = makeCanvas(W, H), x = c.getContext('2d', { willReadFrequently: true });
       x.drawImage(im, 0, 0);
-      var f = E.findCanvas(x.getImageData(0, 0, W, H).data, W, H), view = $('#shot-view'), sc = Math.min(1, 640 / H);
+      var data = x.getImageData(0, 0, W, H).data, f = E.findCanvas(data, W, H), view = $('#shot-view'), sc = Math.min(1, 640 / H);
+      var tools = f ? E.findTools(data, W, H, f.y + f.h) : null;
       URL.revokeObjectURL(url);
       view.width = Math.round(W * sc); view.height = Math.round(H * sc); view.hidden = false;
       var v = view.getContext('2d');
@@ -201,10 +202,17 @@
       if (f.shape === 'circle') { v.beginPath(); v.ellipse((f.x + f.w / 2) * sc, (f.y + f.h / 2) * sc, f.w / 2 * sc, f.h / 2 * sc, 0, 0, Math.PI * 2); v.stroke(); }
       else v.strokeRect(f.x * sc - 1.5, f.y * sc - 1.5, f.w * sc + 3, f.h * sc + 3);
       Ph.rx = f.x; Ph.ry = f.y; Ph.rw = f.w; Ph.rh = f.h; Ph.scw = W; Ph.sch = H;
+      if (tools) {
+        Ph.tx = tools.pen[0]; Ph.ty = tools.pen[1]; Ph.ex = tools.eraser[0]; Ph.ey = tools.eraser[1];
+        [tools.pen, tools.eraser].forEach(function (t) { v.beginPath(); v.arc(t[0] * sc, t[1] * sc, 14, 0, Math.PI * 2); v.stroke(); });
+      }
       if (f.shape === 'circle') P.shape = 'circle';
       save(KEY_PHONE, Ph);
       paintPhone(); syncPhysical(); paintControls(); drawSource(); replan();
-      note.textContent = 'Found it: left ' + f.x + ', top ' + f.y + ', ' + f.w + ' × ' + f.h + (f.shape === 'circle' ? ' (round)' : '') + ' on a ' + W + ' × ' + H + ' screen. Filled in below.';
+      note.textContent = 'Found the canvas: left ' + f.x + ', top ' + f.y + ', ' + f.w + ' × ' + f.h + (f.shape === 'circle' ? ' (round)' : '') + ' on a ' + W + ' × ' + H + ' screen' +
+        (tools ? ', and the Brush (' + tools.pen.join(', ') + ') and Eraser (' + tools.eraser.join(', ') + ') buttons. Filled in below.'
+          : '. No Brush and Eraser buttons on it: pick the Brush so its panel opens and use a new screenshot, because the canvas moves up when the panel opens.');
+      if (tools) $('#tools-more').open = true;
       toast('Canvas lined up: ' + f.w + ' × ' + f.h);
     };
     im.onerror = function () { URL.revokeObjectURL(url); note.textContent = 'That file could not be opened as an image.'; };
@@ -250,7 +258,7 @@
   var planner = null, matcher = null, seq = 0, planWanted = null, planBusy = false, matchId = 0;
 
   function spawn() {
-    var w = new Worker('worker.js?v=37');
+    var w = new Worker('worker.js?v=38');
     w.onerror = function () { canWork = false; };
     return w;
   }
@@ -623,7 +631,9 @@
     var mins = est.sec / 60, t = mins < 1.5 ? Math.round(est.sec) + ' s' : mins < 90 ? Math.round(mins) + ' min' : (mins / 60).toFixed(1) + ' h';
     $('#summary').innerHTML = '<b>' + fmtN(r.strokes.length) + '</b> strokes · <b>' + sw + '</b> tool switches · about <b>' + t + '</b> on the phone (' + fmtN(est.calls) + ' commands, rough estimate).';
     $('#stats').textContent = fmtN(r.strokes.length) + ' strokes · about ' + t + ' to draw';
-    $('#eraser-note').textContent = sw ? 'this drawing uses the eraser' : '';
+    var noButtons = sw && !(+Ph.ex || +Ph.ey) && !(Ph.ex2 || '').trim();
+    $('#eraser-note').textContent = sw ? (noButtons ? 'this drawing uses the eraser: set its buttons' : 'this drawing uses the eraser') : '';
+    $('#eraser-warn').hidden = !noButtons;
   }
   function download(name, text) {
     var a = document.createElement('a');

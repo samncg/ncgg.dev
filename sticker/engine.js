@@ -1063,6 +1063,56 @@
     return best;
   }
 
+  /*
+   * The brush and eraser buttons, from the same screenshot (taken with the pen picked, so HeyTea's tool panel
+   * is open). Below the canvas (from row y0), the selected tool sits in a light grey pill; the items in that
+   * row, left to right, are Brush, Eraser and a tick. Returns { pen: [x, y], eraser: [x, y], selected } in
+   * screenshot pixels, or null when no such row is found (the panel is closed, or it is another app).
+   */
+  function findTools(data, W, H, y0) {
+    function lum(x, y) { var k = (y * W + x) * 4; return 0.299 * data[k] + 0.587 * data[k + 1] + 0.114 * data[k + 2]; }
+    function same(a, b) { return Math.abs(data[a] - data[b]) <= 2 && Math.abs(data[a + 1] - data[b + 1]) <= 2 && Math.abs(data[a + 2] - data[b + 2]) <= 2; }
+    var x, y, pills = [];
+    // rows holding a light grey run 10..45% of the width with lighter pixels at both ends: the pill's top and
+    // bottom parts (text breaks up the rows in between)
+    for (y = Math.max(0, y0 | 0); y < H; y++) {
+      var best = null, st = 0;
+      for (x = 1; x <= W; x++) {
+        if (x < W && same((y * W + x) * 4, (y * W + st) * 4)) continue;
+        var len = x - st, l = lum(st, y);
+        if (len >= 0.1 * W && len <= 0.45 * W && l >= 228 && l <= 252 && st > 0 && x < W && lum(st - 1, y) > l + 1 && lum(x, y) > l + 1) {
+          if (!best || len > best[1] - best[0]) best = [st, x - 1];
+        }
+        st = x;
+      }
+      if (best) pills.push([y, best[0], best[1]]);
+    }
+    if (!pills.length) return null;
+    // group rows into pills: close rows (text up to 3% of the height tall between them) with overlapping runs
+    var groups = [], g = null;
+    pills.forEach(function (p) {
+      if (g && p[0] - g.y1 <= 0.03 * H && p[1] < g.x1 && p[2] > g.x0) { g.y1 = p[0]; g.x0 = Math.min(g.x0, p[1]); g.x1 = Math.max(g.x1, p[2]); g.n++; }
+      else { g = { y0: p[0], y1: p[0], x0: p[1], x1: p[2], n: 1 }; groups.push(g); }
+    });
+    groups = groups.filter(function (q) { return q.y1 - q.y0 >= 0.015 * H && q.y1 - q.y0 <= 0.08 * H; });
+    for (var gi = 0; gi < groups.length; gi++) {
+      var pl = groups[gi], cy = Math.round((pl.y0 + pl.y1) / 2), items = [], s0 = -1, last = -1, gap = 0.02 * W;
+      // the row's items: columns with something drawn in them (icons, labels), split at wide gaps
+      for (x = 0; x < W; x++) {
+        var on = false;
+        for (y = pl.y0; y <= pl.y1 && !on; y += 2) if (lum(x, y) < 215) on = true;
+        if (on) { if (s0 < 0 || x - last > gap) { if (s0 >= 0) items.push([s0, last]); s0 = x; } last = x; }
+      }
+      if (s0 >= 0) items.push([s0, last]);
+      if (items.length < 2) continue;
+      var mid = items.map(function (r) { return Math.round((r[0] + r[1]) / 2); });
+      var inPill = mid.map(function (m) { return m >= pl.x0 && m <= pl.x1; });
+      if (!inPill[0] && !inPill[1]) continue;
+      return { pen: [mid[0], cy], eraser: [mid[1], cy], selected: inPill[0] ? 'pen' : 'eraser' };
+    }
+    return null;
+  }
+
   /* ---------- script for the phone ---------- */
 
   function sh(lines) { return lines.join('\n') + '\n'; }
@@ -1147,6 +1197,6 @@
     DEFAULTS: DEFAULTS, STYLES: STYLES, isPixel: isPixel, withDefaults: withDefaults, copy: copy,
     grid: grid, px: px, luminance: luminance, adjust: adjust, plan: plan,
     rasterize: rasterize, compare: compare, inkTarget: inkTarget, autoMatch: autoMatch,
-    findCanvas: findCanvas, script: script, testScript: testScript, estimate: estimate
+    findCanvas: findCanvas, findTools: findTools, script: script, testScript: testScript, estimate: estimate
   };
 })(typeof self !== 'undefined' ? self : this);

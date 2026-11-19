@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@300..700&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap">
-  <link rel="stylesheet" href="sticker.css?v=8">
+  <link rel="stylesheet" href="sticker.css?v=9">
   <script>
     try { if (localStorage.getItem('ncgg:theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
   </script>
@@ -150,6 +150,7 @@
         <section class="step" id="step-draw" aria-labelledby="h-draw">
           <h2 id="h-draw"><span>04</span>Draw it</h2>
           <p class="summary" id="summary">Add an image first.</p>
+          <p class="warn" id="eraser-warn" hidden>This drawing switches to the eraser, but the eraser and pen buttons aren't set, so the script will stop at every switch and wait for you to tap them. Find them from a screenshot in step 03, or enter them under "Eraser and pen buttons".</p>
           <div class="actions">
             <button class="btn btn--primary" type="button" id="download" disabled>download draw.sh</button>
             <button class="btn" type="button" id="copy" disabled>copy script</button>
@@ -177,7 +178,7 @@
     <span>runs entirely in your browser</span>
   </footer>
 
-  <script src="engine.js?v=36"></script>
-  <script src="app.js?v=19"></script>
+  <script src="engine.js?v=37"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
