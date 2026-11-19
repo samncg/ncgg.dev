@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@300..700&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=20261118h">
+  <link rel="stylesheet" href="css/style.css?v=20261119b">
   <script>
     document.documentElement.classList.add('js');
     try { if (localStorage.getItem('ncgg:theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
@@ -304,7 +304,7 @@
             </figure>
             <figure class="sdemo__frame">
               <div class="sdemo__paper">
-                <canvas data-sticker-canvas width="880" height="880" role="img" aria-label="The same image being redrawn on a white sticker canvas, row by row, with 6 px brush strokes and 8 px eraser sweeps."></canvas>
+                <canvas data-sticker-canvas width="880" height="880" role="img" aria-label="The same image being redrawn on a white sticker canvas, tile by tile, with 6 px brush strokes and 8 px eraser sweeps."></canvas>
                 <span class="sdemo__pen" data-sticker-pen hidden></span>
               </div>
               <figcaption><span>sticker canvas</span><span data-sticker-count></span></figcaption>
@@ -320,20 +320,21 @@
             <div class="sdemo__copy">
               <h3>Why it takes several passes</h3>
               <p>The smallest brush the HeyTea sticker canvas offers is <strong>6 px</strong>. That is too coarse to draw detail in one go: anything thinner than the brush tip, like an eyelid or a strand of hair, gets filled in.</p>
-              <p>So the drawer plans in passes. A brush pass lays down tone with 6 px strokes, then an 8 px eraser pass sweeps back over the same rows and carves the highlights and edges out of it. They alternate, each pass keeping only the strokes that bring the canvas closer to the image, until it stops improving or hits the pass limit. It works top to bottom in bands so each one settles before the next starts.</p>
-              <p class="sdemo__fine">This is the planner from the tool, running in your browser on the settings below. On the phone the same strokes are sent as swipes over ADB. <a href="sticker/">Try it with your own image</a>.</p>
+              <p>So the drawer plans in passes. A brush pass lays down tone with 6 px strokes, then an 8 px eraser pass sweeps back over the same rows and carves the highlights and edges out of it. They alternate, each pass keeping only the strokes that bring the canvas closer to the image, until it stops improving or hits the pass limit. Local contrast gives dark and pale regions their own range first, so faces keep their features in black ink alone.</p>
+              <p>The canvas is drawn tile by tile from the top left, each tile finished before the next starts.</p>
+              <p class="sdemo__fine">This is the tool's own engine running in your browser, on the settings its auto-match picks for this picture. On the phone the same strokes are sent as swipes over ADB. <a href="sticker/">Try it with your own image</a>.</p>
             </div>
             <dl class="sdemo__settings">
-              <div><dt>style</dt><dd>pixel art: brush + eraser sweep (dithered)</dd></div>
-              <div><dt>canvas</dt><dd>880 × 880, rectangle, fit inside</dd></div>
+              <div><dt>style</dt><dd>pixel sweep: brush + eraser, dithered</dd></div>
+              <div><dt>canvas</dt><dd>880 × 880, fill the canvas</dd></div>
               <div><dt>brush</dt><dd>6 px <span>(app minimum)</span></dd></div>
               <div><dt>eraser</dt><dd>8 px</dd></div>
-              <div><dt>passes</dt><dd>4 brush + 4 eraser</dd></div>
-              <div><dt>bands</dt><dd>5 (tiles per side)</dd></div>
-              <div><dt>brightness</dt><dd>+7</dd></div>
-              <div><dt>contrast</dt><dd>−55</dd></div>
-              <div><dt>midtones</dt><dd>114</dd></div>
-              <div><dt>smoothing</dt><dd>0</dd></div>
+              <div><dt>passes</dt><dd>up to 10 brush + 10 eraser</dd></div>
+              <div><dt>tiles</dt><dd>4 × 4, top left first</dd></div>
+              <div><dt>brightness</dt><dd>+3</dd></div>
+              <div><dt>contrast</dt><dd>−30</dd></div>
+              <div><dt>midtones</dt><dd>140</dd></div>
+              <div><dt>local contrast</dt><dd>50</dd></div>
             </dl>
           </div>
         </div>
@@ -411,10 +412,10 @@
     <a href="#top" data-scramble>back to top</a>
   </footer>
 
-  <script src="js/fluid.js?v=20261118h"></script>
-  <script src="js/wire.js?v=20261118h"></script>
-  <script src="js/main.js?v=20261118h"></script>
-  <script src="js/sticker.js?v=20261118h"></script>
-  <script src="js/game.js?v=20261118h"></script>
+  <script src="js/fluid.js?v=20261119b"></script>
+  <script src="js/wire.js?v=20261119b"></script>
+  <script src="js/main.js?v=20261119b"></script>
+  <script src="js/sticker.js?v=20261119b"></script>
+  <script src="js/game.js?v=20261119b"></script>
 </body>
 </html>

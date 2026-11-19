@@ -55,8 +55,7 @@
     { k: 'tile', label: 'Tile sweep: brush and eraser one tile at a time', type: 'check', show: function (m) { return !has('zw', m); } },
     { k: 'guard', label: 'Keep erasers off finished tiles', type: 'check', show: function (m) { return P.tile && !has('zw', m); } },
     { k: 'inv', label: 'Invert', type: 'check' },
-    { k: 'shape', label: 'Sticker shape', type: 'select', options: [['rect', 'rectangle'], ['circle', 'circle']] },
-    { k: 'fit', label: 'Image fit', type: 'select', options: [['contain', 'fit inside'], ['cover', 'fill the canvas']] }
+    { k: 'shape', label: 'Sticker shape', type: 'select', options: [['rect', 'rectangle'], ['circle', 'circle']] }
   ];
   var ALL = TONE.concat(STYLE_CTL, MORE);
 
@@ -98,7 +97,18 @@
     var r = $('input[name="style"][value="' + P.mode + '"]');
     if (r) r.checked = true;
     $$('.paper[data-shape]').forEach(function (p) { p.classList.toggle('is-circle', P.shape === 'circle'); p.style.aspectRatio = (P.rw || 1) + ' / ' + (P.rh || 1); });
+    $$('[data-fit]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-fit') === P.fit)); });
   }
+
+  // image fit sits at the top (step 01): fill the canvas (default) or fit inside
+  $$('[data-fit]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var v = b.getAttribute('data-fit');
+      if (P.fit === v) return;
+      P.fit = v;
+      paintControls(); drawSource(); replan(); softRematch();
+    });
+  });
 
   ALL.forEach(function (c) {
     var wrap = $('[data-key="' + c.k + '"]'), el = $('#c-' + c.k);
@@ -177,7 +187,7 @@
   var planner = null, matcher = null, seq = 0, planWanted = null, planBusy = false, matchId = 0;
 
   function spawn() {
-    var w = new Worker('worker.js?v=33');
+    var w = new Worker('worker.js?v=34');
     w.onerror = function () { canWork = false; };
     return w;
   }

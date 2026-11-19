@@ -1,164 +1,47 @@
-/* Sticker auto-drawer demo.
-   A port of the "Pixel art: brush + eraser sweep" mode from the HeyTea Sticker Drawer tool.
-   The image is adjusted with the same settings the tool uses, planned into brush and eraser
-   strokes, and replayed onto a white canvas at phone scale (880 px, 6 px brush, 8 px eraser). */
+/* Sticker auto-drawer demo (the drawer on the Work card).
+   Runs the real tool's engine (sticker/engine.js, in the tool's own worker) on the sample with the
+   settings auto-match picks for it, and replays the strokes at phone scale (880 px canvas, 6 px brush,
+   8 px eraser), tile by tile, looping. */
 (function () {
   'use strict';
 
-  // Settings from the tool, as used for this image.
-  var CFG = {
-    rw: 880, rh: 880,          // sticker canvas on the phone, px
-    pen: 6, esz: 8,            // brush and eraser, px (6 is the smallest brush the app has)
-    br: 7, co: -55, gm: 114, sm: 0,
-    thr: 90, tn: 5, ps: 4,
-    dither: false              // set by STYLE below
-  };
-  // 'z' dithered sweep. ('w', the threshold sweep, draws nothing here: contrast -55 lifts every
-  // tone above the darkness cutoff of 90, so the cutoff only matters in threshold mode.)
-  var STYLE = 'z';
-  CFG.dither = STYLE === 'z';
-
+  var ENGINE = 'sticker/engine.js?v=34', WORKER = 'sticker/worker.js?v=34';
+  // what the tool's auto-match chooses for the sample with "fill the canvas"
+  var SETTINGS = { mode: 'z', fit: 'cover', br: 3, co: -30, gm: 140, lc: 50, ps: 10, tn: 4, pen: 6, esz: 8, rw: 880, rh: 880 };
   var DRAW_MS = 13000, HOLD_MS = 2600, FADE_MS = 500;
 
-  /* ---------- planning (ported from the tool) ---------- */
-
-  function blur(g, W, H, n) {
-    while (n-- > 0) {
-      var o = new Float32Array(g.length);
-      for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
-        var s = 0, k = 0;
-        for (var j = -1; j < 2; j++) for (var i = -1; i < 2; i++) {
-          var X = x + i, Y = y + j;
-          if (X >= 0 && Y >= 0 && X < W && Y < H) { s += g[Y * W + X]; k++; }
-        }
-        o[y * W + x] = s / k;
-      }
-      g = o;
-    }
-    return g;
+  function makeCanvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function loadEngine(done) {
+    if (window.StickerEngine) { done(); return; }
+    var s = document.createElement('script');
+    s.src = ENGINE; s.onload = done; s.onerror = done;
+    document.head.appendChild(s);
   }
-
-  function adjust(img, W, H) {
-    var c = document.createElement('canvas'); c.width = W; c.height = H;
-    var x = c.getContext('2d', { willReadFrequently: true });
-    x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
-    var iw = img.naturalWidth, ih = img.naturalHeight, s = Math.min(W / iw, H / ih);
-    x.imageSmoothingQuality = 'high';
-    x.drawImage(img, (W - iw * s) / 2, (H - ih * s) / 2, iw * s, ih * s);
-    var d = x.getImageData(0, 0, W, H).data, g = new Float32Array(W * H), i;
-    for (i = 0; i < W * H; i++) g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
-    g = blur(g, W, H, CFG.sm);
-    var b = CFG.br * 2.55, ct = CFG.co * 2.55, f = 259 * (ct + 255) / (255 * (259 - ct)), gm = CFG.gm / 100;
-    for (i = 0; i < W * H; i++) {
-      var v = 255 * Math.pow(g[i] / 255, 1 / gm);
-      v = (v - 128) * f + 128 + b;
-      g[i] = Math.max(0, Math.min(255, v));
-    }
-    return g;
-  }
-
-  // Coverage kernel of a round brush of diameter d (grid cells), 4x4 supersampled.
-  function kern(d) {
-    var r = d / 2, n = Math.ceil(r), K = [], ss = 4;
-    for (var dy = -n; dy <= n; dy++) for (var dx = -n; dx <= n; dx++) {
-      var c = 0;
-      for (var a = 0; a < ss; a++) for (var b = 0; b < ss; b++) {
-        var x = dx - 0.5 + (a + 0.5) / ss, y = dy - 0.5 + (b + 0.5) / ss;
-        if (x * x + y * y <= r * r) c++;
-      }
-      c /= ss * ss;
-      if (c > 0) K.push([dx, dy, c]);
-    }
-    return K;
-  }
-
-  // Greedy brush + eraser sweep. Works top to bottom in nb bands; inside each band it alternates
-  // a brush pass and an eraser pass (up to ps of each), keeping a stroke only where it lowers the
-  // error between the coverage so far and the target tone. Strokes are tagged with band and pass.
-  function sweep(g, W, H, dith, thr, B, E, nb, ps) {
-    var T = new Float32Array(W * H), i;
-    for (i = 0; i < W * H; i++) T[i] = dith ? (255 - g[i]) / 255 : (g[i] < thr ? 1 : 0);
-    var cov = new Float32Array(W * H), Kp = kern(B), Ke = kern(Math.max(E, 0.5)), out = [];
-    var bh = Math.ceil(H / Math.max(1, nb));
-    function f(t, c) { var e = t - c; return e > 0 ? 1.5 * e * e : e * e; }
-    for (var y0 = 0, band = 0; y0 < H; y0 += bh, band++) {
-      var y1 = Math.min(H, y0 + bh), ch = 0;
-      for (var pp = 0; pp < (ps || 12) * 2; pp++) {
-        var er = pp % 2, K = er ? Ke : Kp, lim = er ? -0.15 / (1 + (pp >> 1)) : 0;
-        for (var y = y0; y < y1; y++) {
-          var row = [], s = -1;
-          for (var x = 0; x <= W; x++) {
-            var on = false;
-            if (x < W) {
-              var d = 0, k, X, Y, q, o, n;
-              for (k = 0; k < K.length; k++) {
-                X = x + K[k][0]; Y = y + K[k][1];
-                if (X >= 0 && X < W && Y >= 0 && Y < H) {
-                  q = Y * W + X; o = cov[q];
-                  n = er ? o * (1 - K[k][2]) : 1 - (1 - o) * (1 - K[k][2]);
-                  d += f(T[q], n) - f(T[q], o);
-                }
-              }
-              if (d < lim) {
-                on = true; ch++;
-                for (k = 0; k < K.length; k++) {
-                  X = x + K[k][0]; Y = y + K[k][1];
-                  if (X >= 0 && X < W && Y >= 0 && Y < H) {
-                    q = Y * W + X; o = cov[q];
-                    cov[q] = er ? o * (1 - K[k][2]) : 1 - (1 - o) * (1 - K[k][2]);
-                  }
-                }
-              }
-            }
-            if (on && s < 0) s = x;
-            if (!on && s >= 0) {
-              row.push({ a: s, b: s === x - 1 ? s + 0.01 : x - 1, y: y, er: er, band: band, pass: pp >> 1 });
-              s = -1;
-            }
-          }
-          if (y % 2) { row.reverse(); row.forEach(function (p) { var t = p.a; p.a = p.b; p.b = t; }); }
-          for (i = 0; i < row.length; i++) out.push(row[i]);
-        }
-        if (pp % 2) { if (!ch) break; ch = 0; }
-      }
-    }
-    return { strokes: out, bands: Math.ceil(H / bh) };
-  }
-
-  function grid() {
-    return {
-      W: Math.min(600, Math.max(8, Math.round(CFG.rw / (CFG.pen / 3)))),
-      H: Math.min(600, Math.max(8, Math.round(CFG.rh / (CFG.pen / 3))))
-    };
-  }
-  function args(g, G) {
-    return [g, G.W, G.H, CFG.dither, CFG.thr, CFG.pen * G.W / CFG.rw, CFG.esz * G.W / CFG.rw, CFG.tn, CFG.ps];
-  }
-  function plan(img) {
-    var G = grid(), r = sweep.apply(null, args(adjust(img, G.W, G.H), G));
-    r.W = G.W; r.H = G.H;
-    return r;
-  }
-  // The sweep is ~0.5 s of number crunching; run it off the main thread when workers are available.
+  // plan in the tool's worker; fall back to the main thread where workers or OffscreenCanvas are missing
   function planAsync(img, done) {
-    var G = grid(), g = adjust(img, G.W, G.H), w = null;
-    try {
-      var src = kern.toString() + '\n' + sweep.toString() +
-        '\nonmessage=function(e){postMessage(sweep.apply(null,e.data))};';
-      var url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
-      w = new Worker(url);
-      URL.revokeObjectURL(url);
-    } catch (e) { w = null; }
-    function sync() {
-      setTimeout(function () { var r = sweep.apply(null, args(g, G)); r.W = G.W; r.H = G.H; done(r); }, 0);
+    function onMain() {
+      loadEngine(function () {
+        var E = window.StickerEngine;
+        if (!E) return;
+        setTimeout(function () {
+          var P = E.withDefaults(SETTINGS), G = E.grid(P), base = E.luminance(img, G.W, G.H, P.fit, makeCanvas);
+          var r = E.plan(E.adjust(base, G.W, G.H, P), G.W, G.H, P);
+          done({ W: G.W, H: G.H, strokes: r.strokes.map(function (p) { return { p: p, er: p.er ? 1 : 0, band: p.band, pass: p.pass }; }) });
+        }, 0);
+      });
     }
-    if (!w) { sync(); return; }
-    w.onmessage = function (e) { var r = e.data; r.W = G.W; r.H = G.H; w.terminate(); done(r); };
-    w.onerror = function () { w.terminate(); sync(); };
-    w.postMessage(args(g, G));
+    if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap === 'undefined') { onMain(); return; }
+    var w;
+    try { w = new Worker(WORKER); } catch (e) { onMain(); return; }
+    w.onerror = function () { w.terminate(); onMain(); };
+    w.onmessage = function (e) {
+      var m = e.data;
+      if (m.type === 'ready') { loadEngine(function () { w.postMessage({ type: 'plan', id: 1, P: window.StickerEngine ? window.StickerEngine.withDefaults(SETTINGS) : SETTINGS }); }); }
+      else if (m.type === 'planned') { w.terminate(); done(m.result); }
+      else if (m.type === 'error') { w.terminate(); onMain(); }
+    };
+    createImageBitmap(img).then(function (bmp) { w.postMessage({ type: 'image', bitmap: bmp, id: 0 }, [bmp]); }, function () { w.terminate(); onMain(); });
   }
-
-  /* ---------- playback ---------- */
 
   function Demo(root) {
     var img = root.querySelector('[data-sticker-src]');
@@ -169,15 +52,11 @@
     var toggle = root.querySelector('[data-sticker-toggle]');
     var dlg = root.closest('dialog');
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-    var P = null, planning = false, ctx = cv.getContext('2d'), sc = 0;
-    var raf = 0, idx = 0, t0 = 0, paused = false, pausedAt = 0, phase = 'draw', phaseAt = 0;
+    var R = null, planning = false, ctx = cv.getContext('2d'), sc = 0, tiles = SETTINGS.tn * SETTINGS.tn;
+    var raf = 0, idx = 0, paused = false, pausedAt = 0, phase = 'draw', phaseAt = 0;
 
-    function size() {
-      sc = CFG.rw / P.W;                      // draw at phone pixels: 880 x 880
-      cv.width = P.W * sc; cv.height = P.H * sc;
-    }
+    function size() { sc = SETTINGS.rw / R.W; cv.width = R.W * sc; cv.height = R.H * sc; }
     function clear() {
-      ctx.globalAlpha = 1;
       ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
       ctx.lineCap = ctx.lineJoin = 'round';
       idx = 0;
@@ -186,24 +65,17 @@
       var cur = -1;
       ctx.beginPath();
       for (; idx < n; idx++) {
-        var p = P.strokes[idx];
-        if (p.er !== cur) {
+        var s = R.strokes[idx], p = s.p;
+        if (s.er !== cur) {
           if (cur !== -1) { ctx.stroke(); ctx.beginPath(); }
-          ctx.strokeStyle = p.er ? '#fff' : '#111';
-          ctx.lineWidth = (p.er ? CFG.esz : CFG.pen) * sc * P.W / CFG.rw;
-          cur = p.er;
+          ctx.strokeStyle = s.er ? '#fff' : '#111';
+          ctx.lineWidth = s.er ? SETTINGS.esz : SETTINGS.pen;   // canvas is in phone pixels
+          cur = s.er;
         }
-        ctx.moveTo((p.a + 0.5) * sc, (p.y + 0.5) * sc);
-        ctx.lineTo((p.b + 0.5) * sc, (p.y + 0.5) * sc);
+        ctx.moveTo((p[0][0] + 0.5) * sc, (p[0][1] + 0.5) * sc);
+        for (var j = 1; j < p.length; j++) ctx.lineTo((p[j][0] + 0.5) * sc, (p[j][1] + 0.5) * sc);
       }
       ctx.stroke();
-    }
-    function label(p) {
-      if (!p) return;
-      hudSet(['band ' + (p.band + 1) + '/' + P.bands, 'pass ' + (p.pass + 1) + '/' + CFG.ps, p.er ? 'eraser 8 px' : 'brush 6 px']);
-      pen.style.left = ((p.b + 0.5) / P.W * 100) + '%';
-      pen.style.top = ((p.y + 0.5) / P.H * 100) + '%';
-      pen.classList.toggle('is-eraser', !!p.er);
     }
     var hudLast = '';
     function hudSet(parts) {
@@ -212,43 +84,37 @@
       hudLast = k;
       hud.innerHTML = '<span>' + parts.join('</span><span>') + '</span>';
     }
-    function setCount(n) { count.textContent = n + ' / ' + P.strokes.length + ' strokes'; }
-
+    function label(s) {
+      if (!s) return;
+      hudSet(['tile ' + ((s.band || 0) + 1) + '/' + tiles, 'pass ' + ((s.pass || 0) + 1) + '/' + SETTINGS.ps, s.er ? 'eraser 8 px' : 'brush 6 px']);
+      var q = s.p[s.p.length - 1];
+      pen.style.left = ((q[0] + 0.5) / R.W * 100) + '%';
+      pen.style.top = ((q[1] + 0.5) / R.H * 100) + '%';
+      pen.classList.toggle('is-eraser', !!s.er);
+    }
+    function setCount(n) { count.textContent = n.toLocaleString('en-US') + ' / ' + R.strokes.length.toLocaleString('en-US') + ' strokes'; }
     function finish() {
-      drawTo(P.strokes.length);
+      drawTo(R.strokes.length);
       pen.hidden = true;
-      hudSet(['done', P.bands + ' bands', CFG.ps + ' passes each']);
-      setCount(P.strokes.length);
+      hudSet(['done', tiles + ' tiles', 'up to ' + SETTINGS.ps + ' passes each']);
+      setCount(R.strokes.length);
     }
     function frame(now) {
       raf = requestAnimationFrame(frame);
       if (paused) return;
       var el = now - phaseAt;
       if (phase === 'draw') {
-        var k = Math.min(1, el / DRAW_MS), n = Math.round(k * P.strokes.length);
+        var k = Math.min(1, el / DRAW_MS), n = Math.round(k * R.strokes.length);
         drawTo(n);
-        label(P.strokes[Math.max(0, n - 1)]);
+        label(R.strokes[Math.max(0, n - 1)]);
         setCount(n);
         if (k >= 1) { finish(); phase = 'hold'; phaseAt = now; }
       } else if (phase === 'hold') {
         if (el > HOLD_MS) { phase = 'fade'; phaseAt = now; }
       } else if (phase === 'fade') {
         cv.style.opacity = String(Math.max(0, 1 - el / FADE_MS));
-        if (el > FADE_MS) {
-          clear(); cv.style.opacity = ''; pen.hidden = false;
-          phase = 'draw'; phaseAt = now;
-        }
+        if (el > FADE_MS) { clear(); cv.style.opacity = ''; pen.hidden = false; phase = 'draw'; phaseAt = now; }
       }
-    }
-    function start() {
-      if (!P) return;
-      stop();
-      size(); clear(); cv.style.opacity = '';
-      if (reduce.matches) { finish(); toggle.hidden = true; return; }
-      toggle.hidden = false; setPaused(false);
-      label(P.strokes[0]); setCount(0);
-      pen.hidden = false; phase = 'draw'; phaseAt = performance.now();
-      raf = requestAnimationFrame(frame);
     }
     function stop() { cancelAnimationFrame(raf); raf = 0; }
     function setPaused(v) {
@@ -258,28 +124,35 @@
       paused = v;
       toggle.querySelector('span').textContent = v ? 'play' : 'pause';
       toggle.querySelector('path').setAttribute('d', v ? 'M5 3.5v9l7.5-4.5z' : 'M5.5 4v8M10.5 4v8');
-      pen.classList.toggle('is-paused', v);
     }
     toggle.addEventListener('click', function () { setPaused(!paused); });
-
+    function start() {
+      if (!R) return;
+      stop();
+      size(); clear(); cv.style.opacity = '';
+      if (reduce.matches) { finish(); toggle.hidden = true; return; }
+      toggle.hidden = false; setPaused(false);
+      label(R.strokes[0]); setCount(0);
+      pen.hidden = false; phase = 'draw'; phaseAt = performance.now();
+      raf = requestAnimationFrame(frame);
+    }
     function ready(fn) {
       if (img.complete && img.naturalWidth) fn();
       else img.addEventListener('load', fn, { once: true });
     }
     function open() {
-      if (P) { start(); return; }
+      if (R) { start(); return; }
       if (planning) return;
       planning = true;
       hudSet(['planning strokes…']);
       ready(function () {
         planAsync(img, function (r) {
-          P = r; planning = false;
+          R = r; planning = false;
           if (dlg && !dlg.open) return;
           start();
         });
       });
     }
-
     if (dlg) {
       dlg.addEventListener('drawer:open', open);
       dlg.addEventListener('close', stop);
@@ -287,5 +160,4 @@
   }
 
   document.querySelectorAll('[data-sticker-demo]').forEach(function (el) { Demo(el); });
-  window.StickerPlan = { plan: plan, CFG: CFG };
 })();

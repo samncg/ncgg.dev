@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@300..700&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap">
-  <link rel="stylesheet" href="sticker.css?v=5">
+  <link rel="stylesheet" href="sticker.css?v=6">
   <script>
     try { if (localStorage.getItem('ncgg:theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
   </script>
@@ -85,6 +85,13 @@
             <span class="loaded__thumb" id="thumb" aria-hidden="true"></span>
             <span class="loaded__name" id="file-name"></span>
             <label class="btn" for="file">change</label>
+          </div>
+          <div class="fitrow">
+            <span class="fitrow__k" id="fit-label">image fit</span>
+            <div class="looks" role="group" aria-labelledby="fit-label">
+              <button class="look" type="button" data-fit="cover" aria-pressed="true"><span>fill the canvas</span></button>
+              <button class="look" type="button" data-fit="contain" aria-pressed="false"><span>fit inside</span></button>
+            </div>
           </div>
           <p class="hint">No picture handy? <button class="link" type="button" id="sample">Try the sample</button></p>
         </section>
@@ -163,7 +170,7 @@
     <span>runs entirely in your browser</span>
   </footer>
 
-  <script src="engine.js?v=33"></script>
-  <script src="app.js?v=13"></script>
+  <script src="engine.js?v=34"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>

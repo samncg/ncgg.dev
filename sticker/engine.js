@@ -15,7 +15,7 @@
     mode: 'z', br: 0, co: 0, gm: 100, sm: 0, thr: 140, dth: 240, gap: 2, gap2: 2, auto: true,
     cross: true, era: false, trim: false, tile: false, guard: false, sen: 60, hl: 200,
     esz: 8, tw: 3, tn: 4, ps: 4, lc: 50, res: 150, min: 1, pen: 6, inv: false,
-    shape: 'rect', fit: 'contain', rw: 880, rh: 880
+    shape: 'rect', fit: 'cover', rw: 880, rh: 880
   };
 
   // style id, name, one line, and which controls matter for it
