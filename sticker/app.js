@@ -187,7 +187,7 @@
   var planner = null, matcher = null, seq = 0, planWanted = null, planBusy = false, matchId = 0;
 
   function spawn() {
-    var w = new Worker('worker.js?v=34');
+    var w = new Worker('worker.js?v=35');
     w.onerror = function () { canWork = false; };
     return w;
   }
@@ -213,6 +213,7 @@
         if (planner) planner.terminate();
         if (matcher) matcher.terminate();
         planner = spawn(); matcher = spawn();
+        planBusy = false; planWanted = null; planJobs = {};
         planner.onmessage = onPlanner; matcher.onmessage = onMatcher;
         Promise.all([sendImage(planner), sendImage(matcher)]).then(runMatch, function () { canWork = false; runMatch(); });
       } else runMatch();
@@ -261,6 +262,7 @@
   function runMatch() {
     if (!state.img) return;
     state.matching = true;
+    state.live = null; state.matchPct = 0;
     var id = ++matchId;
     busy(true, 2, 'finding the closest settings');
     setButtons(false);
@@ -286,13 +288,42 @@
     var m = e.data;
     if (m.id !== matchId) return;
     if (m.type === 'progress') {
-      busy(true, m.pct, 'matching the tone · ' + m.pct + '%');
+      state.matchPct = m.pct;
+      if (m.P) livePlan(m.P);
+      paintLive();
     } else if (m.type === 'matched') matched(m.result, m.id);
-    else if (m.type === 'error') { state.matching = false; busy(false); toast('Auto-match failed: ' + m.message); replan(); }
+    else if (m.type === 'error') { state.matching = false; state.live = null; busy(false); toast('Auto-match failed: ' + m.message); replan(); }
   }
+  /* live view: while the search runs, the planner worker (otherwise idle) draws its best settings so far */
+  var KEEP = ['rw', 'rh', 'pen', 'esz', 'shape', 'fit'];
+  function livePlan(bestP) {
+    var Q = E.withDefaults(bestP);
+    KEEP.forEach(function (k) { Q[k] = P[k]; });
+    if (planner) sendPlan(Q, true);
+  }
+  function liveDrawn(res, Q) {
+    if (!state.matching) return; // the search finished; its final plan is on the way
+    state.result = res; state.planP = Q;
+    state.live = { match: res.match, strokes: res.strokes.length, P: Q };
+    if (state.adjusted) drawSource();
+    startDrawing(false);
+    $('#match').textContent = 'best so far ' + Math.round(res.match) + '%';
+    paintLive();
+  }
+  function paintLive() {
+    var L = state.live, pct = state.matchPct || 0;
+    busy(true, pct, L ? 'matching the tone · ' + pct + '% · best so far ' + Math.round(L.match) + '%' : 'matching the tone · ' + pct + '%');
+    if (L) {
+      var Q = L.P, sign = function (v) { return v > 0 ? '+' + v : v < 0 ? '−' + -v : '0'; };
+      $('#stats').textContent = 'Best so far: brightness ' + sign(Q.br) + ', contrast ' + sign(Q.co) + ', midtones ' + Q.gm +
+        ('zw'.indexOf(Q.mode) >= 0 ? ', ' + Q.ps + ' passes' : '') + ' · ' + fmtN(L.strokes) + ' strokes';
+    }
+  }
+
   function matched(r, id) {
     if (id !== matchId) return;
     state.matching = false;
+    state.live = null;
     var keep = { rw: P.rw, rh: P.rh, pen: P.pen, esz: P.esz, shape: P.shape, fit: P.fit };
     P = E.withDefaults(r.P);
     Object.keys(keep).forEach(function (k) { P[k] = keep[k]; });
@@ -349,12 +380,19 @@
     clearTimeout(planTimer);
     planTimer = setTimeout(requestPlan, animate ? 0 : 90);
   }
+  // one plan at a time in the worker; only the newest waiting request is kept. live: a preview of
+  // auto-match's best so far, drawn only while the search is still running
+  var planJobs = {};
+  function sendPlan(Q, live) {
+    if (planBusy) { planWanted = { P: Q, live: live }; return; }
+    planBusy = true;
+    planJobs[++seq] = { P: Q, live: live };
+    planner.postMessage({ type: 'plan', id: seq, P: Q });
+  }
   function requestPlan() {
     var Q = E.copy(P);
     if (canWork && planner) {
-      if (planBusy) { planWanted = Q; return; }
-      planBusy = true;
-      planner.postMessage({ type: 'plan', id: ++seq, P: Q });
+      sendPlan(Q, false);
       $('#stats').textContent = 'Planning strokes…';
       return;
     }
@@ -364,11 +402,16 @@
   }
   function onPlanner(e) {
     var m = e.data;
+    var job = planJobs[m.id];
+    delete planJobs[m.id];
+    if (!job) return; // from a planner that has since been replaced
     if (m.type === 'planned') {
       planBusy = false;
-      if (planWanted) { var Q = planWanted; planWanted = null; planBusy = true; planner.postMessage({ type: 'plan', id: ++seq, P: Q }); return; }
-      planned(m.result, E.copy(P));
-    } else if (m.type === 'error') { planBusy = false; toast('Planning failed: ' + m.message); }
+      // a newer request is waiting: this result is already out of date
+      if (planWanted) { var w = planWanted; planWanted = null; sendPlan(w.P, w.live); return; }
+      if (job.live) liveDrawn(m.result, job.P);
+      else planned(m.result, job.P);
+    } else if (m.type === 'error') { planBusy = false; if (!job.live) toast('Planning failed: ' + m.message); }
   }
   function planned(res, Q) {
     state.result = res; state.planP = Q;

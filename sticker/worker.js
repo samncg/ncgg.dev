@@ -21,9 +21,15 @@ onmessage = function (e) {
     if (!img) throw new Error('no image');
     if (m.type === 'plan') { postMessage({ type: 'planned', id: m.id, result: planFor(m.P) }); return; }
     if (m.type === 'match') {
+      var last = null;
       var r = E.autoMatch(img, m.P, {
         makeCanvas: makeCanvas,
-        onProgress: function (pct, best) { postMessage({ type: 'progress', id: m.id, pct: pct, match: best ? best.match : null, mode: best ? best.P.mode : null }); }
+        onProgress: function (pct, best) {
+          var msg = { type: 'progress', id: m.id, pct: pct, match: best ? best.match : null, mode: best ? best.P.mode : null };
+          // the settings travel only when the best so far changes, so the page can draw it live
+          if (best && best !== last) { last = best; msg.P = best.P; }
+          postMessage(msg);
+        }
       });
       postMessage({ type: 'matched', id: m.id, result: r });
     }
