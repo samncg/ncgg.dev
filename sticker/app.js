@@ -180,6 +180,45 @@
     field('scw', 'Screen width (px)') + field('sch', 'Screen height (px)') + field('mc', 'Combine events into one sendevent call (only if your phone supports it)', { check: true });
 
   var REPLAN_KEYS = { rw: 1, rh: 1, pen: 1, esz: 1 };
+
+  // auto line-up: find the sticker canvas on a screenshot of the phone and fill in its edges
+  function findFromScreenshot(file) {
+    var note = $('#shot-note'), url = URL.createObjectURL(file), im = new Image();
+    note.textContent = 'Looking for the canvas…';
+    im.onload = function () {
+      var W = im.naturalWidth, H = im.naturalHeight, c = makeCanvas(W, H), x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(im, 0, 0);
+      var f = E.findCanvas(x.getImageData(0, 0, W, H).data, W, H), view = $('#shot-view'), sc = Math.min(1, 640 / H);
+      URL.revokeObjectURL(url);
+      view.width = Math.round(W * sc); view.height = Math.round(H * sc); view.hidden = false;
+      var v = view.getContext('2d');
+      v.drawImage(im, 0, 0, view.width, view.height);
+      if (!f) {
+        note.textContent = 'No canvas found on that screenshot. Open Create Sticker in HeyTea so the empty canvas shows, or enter the edges below.';
+        return;
+      }
+      v.strokeStyle = '#ff2d55'; v.lineWidth = 3;
+      if (f.shape === 'circle') { v.beginPath(); v.ellipse((f.x + f.w / 2) * sc, (f.y + f.h / 2) * sc, f.w / 2 * sc, f.h / 2 * sc, 0, 0, Math.PI * 2); v.stroke(); }
+      else v.strokeRect(f.x * sc - 1.5, f.y * sc - 1.5, f.w * sc + 3, f.h * sc + 3);
+      Ph.rx = f.x; Ph.ry = f.y; Ph.rw = f.w; Ph.rh = f.h; Ph.scw = W; Ph.sch = H;
+      if (f.shape === 'circle') P.shape = 'circle';
+      save(KEY_PHONE, Ph);
+      paintPhone(); syncPhysical(); paintControls(); drawSource(); replan();
+      note.textContent = 'Found it: left ' + f.x + ', top ' + f.y + ', ' + f.w + ' × ' + f.h + (f.shape === 'circle' ? ' (round)' : '') + ' on a ' + W + ' × ' + H + ' screen. Filled in below.';
+      toast('Canvas lined up: ' + f.w + ' × ' + f.h);
+    };
+    im.onerror = function () { URL.revokeObjectURL(url); note.textContent = 'That file could not be opened as an image.'; };
+    im.src = url;
+  }
+  $('#shot').addEventListener('change', function () { var f = this.files && this.files[0]; if (f) findFromScreenshot(f); this.value = ''; });
+  // a screenshot dropped here is for lining up, not the picture to draw
+  var finder = $('#finder');
+  ['dragenter', 'dragover'].forEach(function (n) { finder.addEventListener(n, function (e) { e.preventDefault(); e.stopPropagation(); finder.classList.add('is-over'); }); });
+  ['dragleave', 'drop'].forEach(function (n) { finder.addEventListener(n, function (e) { e.preventDefault(); e.stopPropagation(); finder.classList.remove('is-over'); }); });
+  finder.addEventListener('drop', function (e) {
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f && /^image\//.test(f.type)) findFromScreenshot(f);
+  });
   function paintPhone() {
     Object.keys(PHONE_DEFAULTS).forEach(function (k) {
       var el = $('#p-' + k);
@@ -211,7 +250,7 @@
   var planner = null, matcher = null, seq = 0, planWanted = null, planBusy = false, matchId = 0;
 
   function spawn() {
-    var w = new Worker('worker.js?v=36');
+    var w = new Worker('worker.js?v=37');
     w.onerror = function () { canWork = false; };
     return w;
   }

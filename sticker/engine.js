@@ -41,7 +41,10 @@
   function grid(P) {
     var rw = P.rw || 1, rh = P.rh || 1;
     if (isPixel(P.mode)) {
-      return { W: Math.min(600, Math.max(8, Math.round(rw / (P.pen / 3)))), H: Math.min(600, Math.max(8, Math.round(rh / (P.pen / 3)))) };
+      // three cells per brush width, at most 600 cells on the long side; both sides scale together, so cells
+      // stay square on a tall canvas too
+      var cell = Math.max(P.pen / 3, Math.max(rw, rh) / 600);
+      return { W: Math.max(8, Math.round(rw / cell)), H: Math.max(8, Math.round(rh / cell)) };
     }
     return rw >= rh ? { W: P.res, H: Math.max(8, Math.round(P.res * rh / rw)) } : { W: Math.max(8, Math.round(P.res * rw / rh)), H: P.res };
   }
@@ -939,6 +942,127 @@
     return { P: win.P, match: win.match, look: lookOf(win.P), looks: looks, ranking: ranked.map(function (r) { return { mode: r.P.mode, match: Math.round(r.match) }; }) };
   }
 
+  /* ---------- finding the sticker canvas in a phone screenshot ---------- */
+
+  /*
+   * data: RGBA pixels of a screenshot W x H. Returns the drawing area { x, y, w, h, shape, colour, score }
+   * in screenshot pixels, or null when nothing on screen looks like a canvas.
+   * The canvas is an area of one flat colour (HeyTea: light grey inside a white card). For each colour that
+   * covers a fair part of the screen, the rows holding a good share of it form bands, and within a band the
+   * columns do too: that is a rectangle with exact edges. Strokes already drawn only lower those shares, so
+   * a canvas with a drawing on it is still found. The winner is the largest rectangle whose inside edges are
+   * mostly its colour and that doesn't run into the screen edges (status bars, banners and the page itself).
+   */
+  function findCanvas(data, W, H, debug) {
+    var s = Math.max(1, Math.round(Math.min(W, H) / 300)), cw = Math.floor(W / s), ch = Math.floor(H / s), n = cw * ch, x, y, i, k;
+    // candidate colours: the averages of flat s x s cells, grouped
+    var groups = [];
+    for (y = 0; y < ch; y++) for (x = 0; x < cw; x++) {
+      var r = 0, g = 0, b = 0, lo = 255, hi = 0;
+      for (var yy = y * s; yy < y * s + s; yy++) for (var xx = x * s; xx < x * s + s; xx++) {
+        k = (yy * W + xx) * 4;
+        var l = 0.299 * data[k] + 0.587 * data[k + 1] + 0.114 * data[k + 2];
+        r += data[k]; g += data[k + 1]; b += data[k + 2];
+        if (l < lo) lo = l; if (l > hi) hi = l;
+      }
+      if (hi - lo > 6) continue;
+      r /= s * s; g /= s * s; b /= s * s;
+      for (i = 0; i < groups.length; i++) {
+        var q = groups[i];
+        if (Math.abs(q.c[0] - r) <= 4 && Math.abs(q.c[1] - g) <= 4 && Math.abs(q.c[2] - b) <= 4) { q.n++; break; }
+      }
+      if (i === groups.length) groups.push({ c: [r, g, b], n: 1 });
+    }
+    groups = groups.filter(function (q) { return q.n >= 0.003 * n; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 8);
+
+    // runs of indices whose count reaches `min`, joining gaps up to `gap`
+    function runs(cnt, len, min, gap) {
+      var out = [], st = -1, last = -1;
+      for (var v = 0; v < len; v++) {
+        if (cnt[v] >= min) { if (st < 0 || v - last > gap + 1) { if (st >= 0) out.push([st, last]); st = v; } last = v; }
+      }
+      if (st >= 0) out.push([st, last]);
+      return out;
+    }
+    var best = null;
+    groups.forEach(function (q) {
+      // mc: the canvas colour; mi: ink (anything clearly darker), which counts on a light canvas only when growing its edges
+      var c = q.c, lum = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2], light = lum > 150, mc = new Uint8Array(W * H), mi = new Uint8Array(W * H), rowC = new Uint32Array(H);
+      for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
+        k = (y * W + x) * 4; i = y * W + x;
+        if (Math.abs(data[k] - c[0]) <= 6 && Math.abs(data[k + 1] - c[1]) <= 6 && Math.abs(data[k + 2] - c[2]) <= 6) { mc[i] = 1; rowC[y]++; }
+        else if (light && 0.299 * data[k] + 0.587 * data[k + 1] + 0.114 * data[k + 2] < lum - 30) mi[i] = 1;
+      }
+      var gy = Math.max(2, Math.round(0.002 * H)), gx = Math.max(2, Math.round(0.002 * W));
+      // fractions of canvas colour (and of colour or ink) along a line, over [a, b]
+      function frac(horiz, v, a, b2, ink) {
+        var hit = 0, tot = 0;
+        for (var u = a; u <= b2; u++) { var p = horiz ? v * W + u : u * W + v; tot++; hit += mc[p] || (ink && mi[p]) ? 1 : 0; }
+        return hit / Math.max(1, tot);
+      }
+      function mid(horiz, v, a, b2, ink) { return frac(horiz, v, Math.round(a + (b2 - a) * 0.2), Math.round(b2 - (b2 - a) * 0.2), ink); }
+      runs(rowC, H, Math.max(4, 0.03 * W), gy).forEach(function (ry) {
+        var colC = new Uint32Array(W), hgt = ry[1] - ry[0] + 1;
+        for (y = ry[0]; y <= ry[1]; y++) for (x = 0; x < W; x++) colC[x] += mc[y * W + x];
+        runs(colC, W, Math.max(4, 0.03 * hgt), gx).forEach(function (rx) {
+          // the rows again, within these columns only, so a wider band elsewhere doesn't stretch the canvas
+          var x0 = rx[0], x1 = rx[1], rc = new Uint32Array(H);
+          for (y = ry[0]; y <= ry[1]; y++) for (x = x0; x <= x1; x++) rc[y] += mc[y * W + x];
+          var rr = runs(rc, H, Math.max(4, 0.03 * (x1 - x0 + 1)), gy).sort(function (a, b) { return (b[1] - b[0]) - (a[1] - a[0]); })[0];
+          if (!rr) return;
+          var y0 = rr[0], y1 = rr[1];
+          // grow each edge through lines that are mostly canvas or ink and still show some canvas: a drawing
+          // already on the canvas can cover rows or columns near its edges
+          // how far an edge at v can move in direction d: through lines that are mostly canvas or ink, as long
+          // as canvas colour shows again within a short stretch (solid ink rows inside a drawing are crossed,
+          // the frame or page outside is not)
+          function grow(horiz, v, d, a, b2, lim) {
+            var look = Math.max(3, Math.round(0.04 * (b2 - a + 1)));
+            for (;;) {
+              var t = v + d, ok = -1;
+              for (var j = 0; j < look && t >= 0 && t <= lim; j++, t += d) {
+                if (frac(horiz, t, a, b2, true) < 0.5) break;
+                if (frac(horiz, t, a, b2) >= 0.003) { ok = t; break; }
+              }
+              if (ok < 0) return v;
+              v = ok;
+            }
+          }
+          for (var pass = 0; pass < 2; pass++) {
+            y0 = grow(true, y0, -1, x0, x1, H - 1); y1 = grow(true, y1, 1, x0, x1, H - 1);
+            x0 = grow(false, x0, -1, y0, y1, W - 1); x1 = grow(false, x1, 1, y0, y1, W - 1);
+          }
+          var wid = x1 - x0 + 1, h = y1 - y0 + 1, area = wid * h, asp = wid / h;
+          if (area < 0.03 * W * H || area > 0.8 * W * H || asp < 0.35 || asp > 2.8) return;
+          var touch = (x0 === 0) + (x1 === W - 1) + (y0 === 0) + (y1 === H - 1);
+          if (touch > 1) return;
+          // 3% inside each edge the line is mostly canvas or ink...
+          var dy = Math.max(1, Math.round(0.03 * h)), dx = Math.max(1, Math.round(0.03 * wid));
+          var edge = (mid(true, y0 + dy, x0, x1, true) + mid(true, y1 - dy, x0, x1, true) + mid(false, x0 + dx, y0, y1, true) + mid(false, x1 - dx, y0, y1, true)) / 4;
+          if (edge < 0.25) return;
+          // ...and just outside it is something else (a frame, the page), or it isn't a canvas
+          var out = 0, sides = 0, o = 3;
+          if (y0 - o >= 0) { out += mid(true, y0 - o, x0, x1); sides++; }
+          if (y1 + o < H) { out += mid(true, y1 + o, x0, x1); sides++; }
+          if (x0 - o >= 0) { out += mid(false, x0 - o, y0, y1); sides++; }
+          if (x1 + o < W) { out += mid(false, x1 + o, y0, y1); sides++; }
+          if (sides && out / sides > 0.3) return;
+          // round canvas: the corners are not canvas colour
+          var cs = Math.max(2, Math.round(0.06 * Math.min(wid, h))), corner = 0;
+          [[x0, y0], [x1 - cs + 1, y0], [x0, y1 - cs + 1], [x1 - cs + 1, y1 - cs + 1]].forEach(function (p) {
+            for (var b3 = 0; b3 < cs; b3++) for (var a3 = 0; a3 < cs; a3++) corner += mc[(p[1] + b3) * W + p[0] + a3];
+          });
+          corner /= 4 * cs * cs;
+          var score = area * edge * (touch ? 0.4 : 1);
+          if (debug) debug({ colour: c.map(Math.round), x: x0, y: y0, w: wid, h: h, edge: edge, out: sides ? out / sides : null, score: score / (W * H) });
+          if (!best || score > best.score) best = { x: x0, y: y0, w: wid, h: h, shape: corner < 0.15 && edge > 0.5 ? 'circle' : 'rect', colour: c.map(Math.round), score: score };
+        });
+      });
+    });
+    if (best) best.score = Math.round(best.score / (W * H) * 1000) / 1000;
+    return best;
+  }
+
   /* ---------- script for the phone ---------- */
 
   function sh(lines) { return lines.join('\n') + '\n'; }
@@ -1023,6 +1147,6 @@
     DEFAULTS: DEFAULTS, STYLES: STYLES, isPixel: isPixel, withDefaults: withDefaults, copy: copy,
     grid: grid, px: px, luminance: luminance, adjust: adjust, plan: plan,
     rasterize: rasterize, compare: compare, inkTarget: inkTarget, autoMatch: autoMatch,
-    script: script, testScript: testScript, estimate: estimate
+    findCanvas: findCanvas, script: script, testScript: testScript, estimate: estimate
   };
 })(typeof self !== 'undefined' ? self : this);

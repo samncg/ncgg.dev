@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@300..700&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap">
-  <link rel="stylesheet" href="sticker.css?v=7">
+  <link rel="stylesheet" href="sticker.css?v=8">
   <script>
     try { if (localStorage.getItem('ncgg:theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
   </script>
@@ -124,7 +124,13 @@
 
         <section class="step" id="step-phone" aria-labelledby="h-phone">
           <h2 id="h-phone"><span>03</span>Your phone</h2>
-          <p class="hint">On the phone, turn on <b>Developer options</b>, <b>USB debugging</b> and <b>Pointer location</b>. Open the custom sticker canvas in HeyTea and note where its edges are on screen, in pixels. These are saved on this device.</p>
+          <p class="hint">On the phone, turn on <b>Developer options</b>, <b>USB debugging</b> and <b>Pointer location</b>. Open the custom sticker canvas in HeyTea, then take a screenshot and let the page find the canvas, or note where its edges are on screen, in pixels. These are saved on this device.</p>
+          <div class="finder" id="finder">
+            <input type="file" id="shot" accept="image/*" hidden>
+            <label class="btn" for="shot">find it from a screenshot</label>
+            <span class="finder__note" id="shot-note">A screenshot of the empty canvas, with the pen picked. Drop it here or choose it.</span>
+            <canvas class="finder__view" id="shot-view" width="1" height="1" hidden aria-label="The screenshot, with the canvas that was found outlined"></canvas>
+          </div>
           <div class="fields fields--4" id="canvas-fields"></div>
           <div class="fields fields--2" id="tool-size-fields"></div>
           <div class="fields fields--2" id="method-fields"></div>
@@ -171,7 +177,7 @@
     <span>runs entirely in your browser</span>
   </footer>
 
-  <script src="engine.js?v=35"></script>
-  <script src="app.js?v=18"></script>
+  <script src="engine.js?v=36"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>
