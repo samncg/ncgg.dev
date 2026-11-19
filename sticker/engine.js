@@ -737,7 +737,7 @@
   /*
    * Search for the settings whose drawing comes closest to the image.
    * img: an image or ImageBitmap; P0: current settings (phone size, brush, shape and fit are kept);
-   * env: { makeCanvas, onProgress(pct, best), now }. Styles are screened at a reduced size, the best
+   * env: { makeCanvas, onProgress(pct, best), onTry(P), now }; onTry sees every candidate before it is scored. Styles are screened at a reduced size, the best
    * two are tuned by coordinate descent, and the winner gets a last refinement at full size.
    */
   function autoMatch(img, P0, env) {
@@ -747,6 +747,7 @@
     // k < 1 draws only the centre k x k of the canvas at full scale: a quarter of the work at k = 0.5,
     // with the brush still the right size relative to the picture
     function evaluate(P, k) {
+      if (env.onTry) env.onTry(P, k);
       var G = grid(P), base = baseFor(G.W, G.H), Q = P, W = G.W, H = G.H;
       if (k < 1) {
         W = Math.max(16, Math.round(G.W * k)); H = Math.max(16, Math.round(G.H * k));

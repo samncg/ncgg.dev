@@ -187,7 +187,7 @@
   var planner = null, matcher = null, seq = 0, planWanted = null, planBusy = false, matchId = 0;
 
   function spawn() {
-    var w = new Worker('worker.js?v=35');
+    var w = new Worker('worker.js?v=36');
     w.onerror = function () { canWork = false; };
     return w;
   }
@@ -211,6 +211,7 @@
       drawSource();
       if (canWork) {
         if (planner) planner.terminate();
+        stopLive();
         if (matcher) matcher.terminate();
         planner = spawn(); matcher = spawn();
         planBusy = false; planWanted = null; planJobs = {};
@@ -262,12 +263,12 @@
   function runMatch() {
     if (!state.img) return;
     state.matching = true;
-    state.live = null; state.matchPct = 0;
+    state.live = null; state.matchPct = 0; state.bestMatch = undefined;
     var id = ++matchId;
     busy(true, 2, 'finding the closest settings');
     setButtons(false);
     $('#stats').textContent = 'Drawing the pixel sweep at different tones and comparing it with your image…';
-    if (canWork) { matcher.postMessage({ type: 'match', id: id, P: matchSettings() }); return; }
+    if (canWork) { startLive(); matcher.postMessage({ type: 'match', id: id, P: matchSettings() }); return; }
     setTimeout(function () {
       var r = E.autoMatch(state.img, matchSettings(), { makeCanvas: makeCanvas, onProgress: function () {} });
       matched(r, id);
@@ -289,33 +290,69 @@
     if (m.id !== matchId) return;
     if (m.type === 'progress') {
       state.matchPct = m.pct;
-      if (m.P) livePlan(m.P);
+      if (m.match !== null) state.bestMatch = m.match;
       paintLive();
-    } else if (m.type === 'matched') matched(m.result, m.id);
-    else if (m.type === 'error') { state.matching = false; state.live = null; busy(false); toast('Auto-match failed: ' + m.message); replan(); }
+    } else if (m.type === 'trying') livePlan(m.P);
+    else if (m.type === 'matched') matched(m.result, m.id);
+    else if (m.type === 'error') { state.matching = false; state.live = null; stopLive(); busy(false); toast('Auto-match failed: ' + m.message); replan(); }
   }
-  /* live view: while the search runs, the planner worker (otherwise idle) draws its best settings so far */
+  /*
+   * live view: while the search runs, it sends the settings it is trying twice a second. Planning one can
+   * take longer than that, so two workers of their own take turns (one on a single-core machine); a result
+   * is drawn unless a newer one has already been. They stop when the search does.
+   */
   var KEEP = ['rw', 'rh', 'pen', 'esz', 'shape', 'fit'];
-  function livePlan(bestP) {
-    var Q = E.withDefaults(bestP);
+  var live = { workers: [], wanted: null, seq: 0, shown: 0 };
+  function startLive() {
+    if (!canWork || live.workers.length) return;
+    var n = (navigator.hardwareConcurrency || 2) > 2 ? 2 : 1;
+    for (var i = 0; i < n; i++) (function (L) {
+      L.w.onerror = function () { L.dead = true; };
+      L.w.onmessage = function (e) {
+        var m = e.data;
+        if (m.type === 'ready') L.ready = true;
+        else if (m.type === 'planned' || m.type === 'error') {
+          L.busy = false;
+          if (m.type === 'planned' && state.matching && m.id > live.shown) { live.shown = m.id; liveDrawn(m.result, L.P); }
+        }
+        pumpLive();
+      };
+      live.workers.push(L);
+      sendImage(L.w).catch(function () { L.dead = true; });
+    })({ w: spawn(), ready: false, busy: false, dead: false });
+  }
+  function stopLive() {
+    live.workers.forEach(function (L) { L.w.terminate(); });
+    live.workers = []; live.wanted = null;
+  }
+  function pumpLive() {
+    live.workers.forEach(function (L) {
+      if (!live.wanted || !L.ready || L.busy || L.dead) return;
+      L.busy = true; L.P = live.wanted.P;
+      L.w.postMessage({ type: 'plan', id: live.wanted.id, P: L.P, quick: true });
+      live.wanted = null;
+    });
+  }
+  function livePlan(tryP) {
+    var Q = E.withDefaults(tryP);
     KEEP.forEach(function (k) { Q[k] = P[k]; });
-    if (planner) sendPlan(Q, true);
+    live.wanted = { id: ++live.seq, P: Q };
+    pumpLive();
   }
   function liveDrawn(res, Q) {
-    if (!state.matching) return; // the search finished; its final plan is on the way
     state.result = res; state.planP = Q;
-    state.live = { match: res.match, strokes: res.strokes.length, P: Q };
+    state.live = { strokes: res.strokes.length, P: Q };
     if (state.adjusted) drawSource();
     startDrawing(false);
-    $('#match').textContent = 'best so far ' + Math.round(res.match) + '%';
     paintLive();
   }
   function paintLive() {
-    var L = state.live, pct = state.matchPct || 0;
-    busy(true, pct, L ? 'matching the tone · ' + pct + '% · best so far ' + Math.round(L.match) + '%' : 'matching the tone · ' + pct + '%');
+    var L = state.live, pct = state.matchPct || 0, b = state.bestMatch;
+    busy(true, pct, 'matching the tone · ' + pct + '%' + (b !== undefined ? ' · best so far ' + Math.round(b) + '%' : ''));
+    if (b !== undefined) $('#match').textContent = 'best so far ' + Math.round(b) + '%';
     if (L) {
       var Q = L.P, sign = function (v) { return v > 0 ? '+' + v : v < 0 ? '−' + -v : '0'; };
-      $('#stats').textContent = 'Best so far: brightness ' + sign(Q.br) + ', contrast ' + sign(Q.co) + ', midtones ' + Q.gm +
+      $('#stats').textContent = 'Trying: brightness ' + sign(Q.br) + ', contrast ' + sign(Q.co) + ', midtones ' + Q.gm +
         ('zw'.indexOf(Q.mode) >= 0 ? ', ' + Q.ps + ' passes' : '') + ' · ' + fmtN(L.strokes) + ' strokes';
     }
   }
@@ -324,6 +361,7 @@
     if (id !== matchId) return;
     state.matching = false;
     state.live = null;
+    stopLive();
     var keep = { rw: P.rw, rh: P.rh, pen: P.pen, esz: P.esz, shape: P.shape, fit: P.fit };
     P = E.withDefaults(r.P);
     Object.keys(keep).forEach(function (k) { P[k] = keep[k]; });
@@ -380,19 +418,18 @@
     clearTimeout(planTimer);
     planTimer = setTimeout(requestPlan, animate ? 0 : 90);
   }
-  // one plan at a time in the worker; only the newest waiting request is kept. live: a preview of
-  // auto-match's best so far, drawn only while the search is still running
+  // one plan at a time in the worker; only the newest waiting request is kept
   var planJobs = {};
-  function sendPlan(Q, live) {
-    if (planBusy) { planWanted = { P: Q, live: live }; return; }
+  function sendPlan(Q) {
+    if (planBusy) { planWanted = Q; return; }
     planBusy = true;
-    planJobs[++seq] = { P: Q, live: live };
+    planJobs[++seq] = Q;
     planner.postMessage({ type: 'plan', id: seq, P: Q });
   }
   function requestPlan() {
     var Q = E.copy(P);
     if (canWork && planner) {
-      sendPlan(Q, false);
+      sendPlan(Q);
       $('#stats').textContent = 'Planning strokes…';
       return;
     }
@@ -402,16 +439,15 @@
   }
   function onPlanner(e) {
     var m = e.data;
-    var job = planJobs[m.id];
+    var Q = planJobs[m.id];
     delete planJobs[m.id];
-    if (!job) return; // from a planner that has since been replaced
+    if (!Q) return; // from a planner that has since been replaced
     if (m.type === 'planned') {
       planBusy = false;
       // a newer request is waiting: this result is already out of date
-      if (planWanted) { var w = planWanted; planWanted = null; sendPlan(w.P, w.live); return; }
-      if (job.live) liveDrawn(m.result, job.P);
-      else planned(m.result, job.P);
-    } else if (m.type === 'error') { planBusy = false; if (!job.live) toast('Planning failed: ' + m.message); }
+      if (planWanted) { var w = planWanted; planWanted = null; sendPlan(w); return; }
+      planned(m.result, Q);
+    } else if (m.type === 'error') { planBusy = false; toast('Planning failed: ' + m.message); }
   }
   function planned(res, Q) {
     state.result = res; state.planP = Q;
