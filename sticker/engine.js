@@ -1139,6 +1139,16 @@
     return null;
   }
 
+  /*
+   * HeyTea's smallest brush and eraser on screen, in px. They are sized in dp, about 3 dp: 10.5 px on a
+   * 560 dpi phone (measured 10.7 px brush, 10 to 10.7 px eraser, on a 1015 px wide canvas). With the screen
+   * density (Android's dpi, from "adb shell wm density") that is exact; without it, from the canvas width.
+   */
+  function toolSize(canvasW, dpi) {
+    var v = dpi ? 3 * dpi / 160 : canvasW * 10.6 / 1015;
+    return Math.max(1, Math.round(v * 2) / 2);
+  }
+
   /* ---------- script for the phone ---------- */
 
   function sh(lines) { return lines.join('\n') + '\n'; }
@@ -1223,6 +1233,6 @@
     DEFAULTS: DEFAULTS, STYLES: STYLES, isPixel: isPixel, withDefaults: withDefaults, copy: copy,
     grid: grid, px: px, luminance: luminance, adjust: adjust, plan: plan,
     rasterize: rasterize, compare: compare, inkTarget: inkTarget, autoMatch: autoMatch,
-    findCanvas: findCanvas, findTools: findTools, script: script, testScript: testScript, estimate: estimate
+    findCanvas: findCanvas, findTools: findTools, toolSize: toolSize, script: script, testScript: testScript, estimate: estimate
   };
 })(typeof self !== 'undefined' ? self : this);

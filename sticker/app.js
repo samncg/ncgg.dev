@@ -168,7 +168,7 @@
     return '<label class="field' + (opts.wide ? ' field--wide' : '') + '" data-pkey="' + k + '"><span>' + label + '</span>' + input + (opts.small ? '<small>' + opts.small + '</small>' : '') + '</label>';
   }
   $('#canvas-fields').innerHTML = field('rx', 'Left') + field('ry', 'Top') + field('rw', 'Width') + field('rh', 'Height');
-  $('#tool-size-fields').innerHTML = field('pen', 'Brush size (px)', { small: 'HeyTea’s smallest brush is 6 px, which is why detail takes several passes.', step: 0.5 }) +
+  $('#tool-size-fields').innerHTML = field('pen', 'Brush size (px)', { small: 'How wide HeyTea’s smallest brush really draws on this phone: about 3 dp, 10.5 px at 560 dpi. Finding the canvas from a screenshot sets it.', step: 0.5 }) +
     field('esz', 'Eraser size (px)', { step: 0.5 });
   $('#method-fields').innerHTML = field('method', 'How the pen moves', { options: [['sw', 'swipes · any Android'], ['mo', 'continuous · Android 10+'], ['fe', 'fast · raw touch events']] }) +
     field('dur', 'Swipe time (ms)', { small: 'Lower is faster; raise it if lines come out broken.' });
@@ -202,6 +202,9 @@
       if (f.shape === 'circle') { v.beginPath(); v.ellipse((f.x + f.w / 2) * sc, (f.y + f.h / 2) * sc, f.w / 2 * sc, f.h / 2 * sc, 0, 0, Math.PI * 2); v.stroke(); }
       else v.strokeRect(f.x * sc - 1.5, f.y * sc - 1.5, f.w * sc + 3, f.h * sc + 3);
       Ph.rx = f.x; Ph.ry = f.y; Ph.rw = f.w; Ph.rh = f.h; Ph.scw = W; Ph.sch = H;
+      // HeyTea's smallest brush and eraser, as wide as they draw on this screen
+      var size = E.toolSize(f.w);
+      Ph.pen = size; Ph.esz = size;
       if (tools) {
         Ph.tx = tools.pen[0]; Ph.ty = tools.pen[1]; Ph.ex = tools.eraser[0]; Ph.ey = tools.eraser[1];
         [tools.pen, tools.eraser].forEach(function (t) { v.beginPath(); v.arc(t[0] * sc, t[1] * sc, 14, 0, Math.PI * 2); v.stroke(); });
@@ -210,7 +213,7 @@
       save(KEY_PHONE, Ph);
       paintPhone(); syncPhysical(); paintControls(); drawSource(); replan();
       note.textContent = 'Found the canvas: left ' + f.x + ', top ' + f.y + ', ' + f.w + ' × ' + f.h + (f.shape === 'circle' ? ' (round)' : '') + ' on a ' + W + ' × ' + H + ' screen' +
-        (tools ? ', and the Brush (' + tools.pen.join(', ') + ') and Eraser (' + tools.eraser.join(', ') + ') buttons. Filled in below.'
+        '; brush and eraser about ' + size + ' px wide' + (tools ? '; and the Brush (' + tools.pen.join(', ') + ') and Eraser (' + tools.eraser.join(', ') + ') buttons. Filled in below.'
           : '. No Brush and Eraser buttons on it: pick the Brush so its panel opens and use a new screenshot, because the canvas moves up when the panel opens.');
       if (tools) $('#tools-more').open = true;
       toast('Canvas lined up: ' + f.w + ' × ' + f.h);
@@ -258,7 +261,7 @@
   var planner = null, matcher = null, seq = 0, planWanted = null, planBusy = false, matchId = 0;
 
   function spawn() {
-    var w = new Worker('worker.js?v=39');
+    var w = new Worker('worker.js?v=40');
     w.onerror = function () { canWork = false; };
     return w;
   }
