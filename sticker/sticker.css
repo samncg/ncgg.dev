@@ -13,6 +13,7 @@
 .look:hover:not([aria-pressed="true"]) { color: var(--fg); }
 .look[hidden] { display: none; }
 .fitrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.quicktone { gap: 6px; }
 .fitrow__k { font-size: 0.75rem; color: var(--fg-3); letter-spacing: 0.06em; text-transform: uppercase; }
 :root {
   --bg: #000; --bg-rgb: 0 0 0;

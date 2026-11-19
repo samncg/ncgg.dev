@@ -75,6 +75,29 @@
       (c.hint ? '<p class="ctl__hint">' + c.hint + '</p>' : '') + '</div>';
   }
   $('#tone').innerHTML = TONE.map(ctlHTML).join('');
+  // brightness and contrast again at the top (step 01), kept in step with the ones under Tone
+  var QUICK = TONE.filter(function (c) { return c.k === 'br' || c.k === 'co'; });
+  $('#quick-tone').innerHTML = QUICK.map(function (c) {
+    return '<div class="ctl" data-qkey="' + c.k + '"><label for="q-' + c.k + '">' + c.label + '</label>' +
+      '<input type="range" id="q-' + c.k + '" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '">' +
+      '<input class="num" type="number" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '" aria-label="' + c.label + ' value"></div>';
+  }).join('');
+  function paintQuick() {
+    QUICK.forEach(function (c) {
+      var n = $('.num', $('[data-qkey="' + c.k + '"]'));
+      $('#q-' + c.k).value = P[c.k];
+      if (document.activeElement !== n) n.value = P[c.k];
+    });
+  }
+  QUICK.forEach(function (c) {
+    var el = $('#q-' + c.k), num = $('.num', $('[data-qkey="' + c.k + '"]'));
+    el.addEventListener('input', function () { P[c.k] = +el.value; paintControls(); replan(); });
+    num.addEventListener('input', function () {
+      var v = parseFloat(num.value);
+      if (isNaN(v)) return;
+      P[c.k] = Math.max(c.min, Math.min(c.max, v)); paintControls(); replan();
+    });
+  });
   $('#style-controls').innerHTML = STYLE_CTL.map(ctlHTML).join('');
   $('#more-controls').innerHTML = MORE.map(ctlHTML).join('');
 
@@ -98,6 +121,7 @@
     if (r) r.checked = true;
     $$('.paper[data-shape]').forEach(function (p) { p.classList.toggle('is-circle', P.shape === 'circle'); p.style.aspectRatio = (P.rw || 1) + ' / ' + (P.rh || 1); });
     $$('[data-fit]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-fit') === P.fit)); });
+    paintQuick();
   }
 
   // image fit sits at the top (step 01): fill the canvas (default) or fit inside
@@ -118,12 +142,12 @@
       el.addEventListener('change', function () { P[c.k] = el.value; paintControls(); drawSource(); replan(); if (c.k === 'fit' || c.k === 'shape') softRematch(); });
     } else {
       var num = $('.num', wrap);
-      el.addEventListener('input', function () { P[c.k] = +el.value; num.value = el.value; replan(); });
+      el.addEventListener('input', function () { P[c.k] = +el.value; num.value = el.value; paintQuick(); replan(); });
       num.addEventListener('input', function () {
         var v = parseFloat(num.value);
         if (isNaN(v)) return;
         v = Math.max(c.min, Math.min(c.max, v));
-        P[c.k] = v; el.value = v; replan();
+        P[c.k] = v; el.value = v; paintQuick(); replan();
       });
     }
   });
