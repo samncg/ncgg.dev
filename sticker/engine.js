@@ -1188,9 +1188,9 @@
   function toolSwitch(eraser, L, Ph) {
     var bx = eraser ? Ph.ex : Ph.tx, by = eraser ? Ph.ey : Ph.ty, d = Ph.sd || 2, pr = Ph.pt;
     var list = (bx || by ? [[bx, by]] : []).concat(taps(eraser ? Ph.ex2 : Ph.tx2));
-    L.push('echo "Tool: ' + (eraser ? 'eraser' : 'pen') + '"');
+    L.push('# Tool: ' + (eraser ? 'eraser' : 'pen'));
     L.push('sleep ' + d / 2);
-    if (!list.length) { L.push('echo "Switch to the ' + (eraser ? 'eraser' : 'pen') + ' now"'); L.push('sleep ' + d * 5); }
+    if (!list.length) { L.push("printf '\\n%s\\n' \"Switch to the " + (eraser ? 'eraser' : 'pen') + " now\""); L.push('sleep ' + d * 5); }
     else list.forEach(function (m) {
       L.push(pr > 0 ? 'input swipe ' + m[0] + ' ' + m[1] + ' ' + m[0] + ' ' + m[1] + ' ' + pr : 'input tap ' + m[0] + ' ' + m[1]);
       L.push('sleep ' + d);
@@ -1254,8 +1254,9 @@
         swipe(p[j - 1], p[j]);
         if (X(p[j - 1]) !== X(p[j]) || Y(p[j - 1]) !== Y(p[j])) swipe(p[j], p[j - 1]);
       }
+      L.push(STROKE_END);
     });
-    return sh(L);
+    return sh(withProgress(L, strokes.length));
   }
   // a short script that draws a line, erases a gap in it, then draws a second line
   function testScript(W, H, Ph) {
@@ -1277,16 +1278,55 @@
   }
   // phone time from the script: each sendevent ~6 ms; each input command ~60 ms to start (measured: 98 ms for a
   // 40 ms swipe, 162 ms for a 100 ms one) plus its own duration; plus sleeps
+  // seconds one script line takes on the phone (measured: ~60 ms to start an input command plus its own
+  // duration, 118 ms per motion event, ~6 ms per sendevent), and whether it is a command
+  function cost(l) {
+    var m = l.match(/^sleep ([\d.]+)/), sw = l.match(/^input swipe \S+ \S+ \S+ \S+ (\d+)/);
+    if (/^sendevent/.test(l)) return [0.006, 1];
+    if (sw) return [0.06 + sw[1] / 1000, 1];
+    if (/^input/.test(l)) return [0.12, 1];
+    return [m ? +m[1] : 0, 0];
+  }
   function estimate(text) {
     var sec = 0, calls = 0;
-    text.split('\n').forEach(function (l) {
-      var m = l.match(/^sleep ([\d.]+)/), sw = l.match(/^input swipe \S+ \S+ \S+ \S+ (\d+)/);
-      if (/^sendevent/.test(l)) { sec += 0.006; calls++; }
-      else if (sw) { sec += 0.06 + sw[1] / 1000; calls++; }
-      else if (/^input/.test(l)) { sec += 0.12; calls++; }   // motionevent: measured 118 ms each
-      else if (m) sec += +m[1];
-    });
+    text.split('\n').forEach(function (l) { var c = cost(l); sec += c[0]; calls += c[1]; });
     return { sec: sec, calls: calls };
+  }
+
+  /*
+   * A progress bar in the script: one line redrawn in place (\r) with the bar, percent done, time left, the
+   * tool and the strokes drawn. Progress is weighted by each command's expected time, so it moves evenly.
+   * Time left starts from the plan's estimate; after 20 s and 3% it comes from the drawing's own pace
+   * (elapsed / done * left), which follows the phone as it slows down on a full canvas.
+   */
+  var STROKE_END = '\u0001';
+  var BAR_FN = [
+    'T0=$(date +%s)',
+    "t() { if [ \"$1\" -ge 3600 ]; then printf '%dh %02dm' $(( $1 / 3600 )) $(( $1 % 3600 / 60 )); elif [ \"$1\" -ge 60 ]; then printf '%dm %02ds' $(( $1 / 60 )) $(( $1 % 60 )); else printf '%ds' \"$1\"; fi; }",
+    // bar <per mille done> <bar text> <planned seconds left> <label>
+    'bar() { e=$(( $(date +%s) - T0 )); if [ "$1" -ge 30 ] && [ "$e" -ge 20 ]; then l=$(( e * (1000 - $1) / $1 )); else l=$3; fi; ' +
+      "printf '\\r[%s] %3d%%  %s left  %s   ' \"$2\" $(( $1 / 10 )) \"$(t $l)\" \"$4\"; }"
+  ];
+  function withProgress(L, nStrokes) {
+    var head = HEAD.length, body = L.slice(head), total = 0, i;
+    body.forEach(function (l) { total += cost(l)[0]; });
+    var step = Math.max(total / 200, 2), next = 0, done = 0, at = 0, strokes = 0, tool = 'brush', out = [], WIDTH = 24;
+    function fmtN(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function bar(pm) {
+      var full = Math.round(pm * WIDTH / 1000), b = new Array(full + 1).join('#') + new Array(WIDTH - full + 1).join('-');
+      return 'bar ' + pm + ' "' + b + '" ' + Math.round(total - at) + ' "' + tool + ' | ' + fmtN(strokes) + '/' + fmtN(nStrokes) + ' strokes"';
+    }
+    for (i = 0; i < body.length; i++) {
+      var l = body[i];
+      if (l === STROKE_END) { strokes++; continue; }
+      var tm = /^# Tool: (\w+)/.exec(l);
+      if (tm) tool = tm[1] === 'pen' ? 'brush' : 'eraser';
+      if (at >= next) { out.push(bar(Math.min(999, Math.floor(1000 * at / (total || 1))))); next += step; }
+      out.push(l);
+      at += cost(l)[0];
+    }
+    out.push(bar(1000), "printf '\\n'", 'echo "Finished in $(t $(( $(date +%s) - T0 )))"');
+    return L.slice(0, head).concat(BAR_FN, out);
   }
 
   root.StickerEngine = {
