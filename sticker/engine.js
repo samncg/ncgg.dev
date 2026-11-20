@@ -1294,28 +1294,40 @@
   }
 
   /*
-   * A progress bar in the script: one line redrawn in place (\r) with the bar, percent done, time left, the
-   * tool and the strokes drawn. Progress is weighted by each command's expected time, so it moves evenly.
-   * Time left starts from the plan's estimate; after 20 s and 3% it comes from the drawing's own pace
-   * (elapsed / done * left), which follows the phone as it slows down on a full canvas.
+   * A progress bar in the script, one line redrawn in place (\r ... ESC[K):
+   *   ████████████▋░░░░░░░░░░░   52%   31m 05s left   ✏ brush   12,480 / 23,712
+   * a header first, and "✔ Finished in ..." at the end. The bar fills in eighths of a block. Progress is
+   * weighted by each command's expected time, so it moves evenly. Time left starts from the plan's estimate;
+   * after 20 s and 3% it comes from the drawing's own pace (elapsed / done * left), which follows the phone
+   * as it slows down on a full canvas. Colours (256-colour ANSI) are left out when NO_COLOR is set:
+   *   adb shell "NO_COLOR=1 sh /sdcard/draw.sh"
+   * The line stays under 80 columns so it never wraps.
    */
-  var STROKE_END = '\u0001';
+  var STROKE_END = '\u0001', BAR_W = 24, EIGHTHS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
   var BAR_FN = [
     'T0=$(date +%s)',
+    "if [ -z \"$NO_COLOR\" ]; then A=$(printf '\\033[38;5;141m'); G=$(printf '\\033[38;5;238m'); B=$(printf '\\033[1m'); " +
+      "C=$(printf '\\033[38;5;80m'); E=$(printf '\\033[38;5;211m'); D=$(printf '\\033[38;5;245m'); OK=$(printf '\\033[38;5;114m'); R=$(printf '\\033[0m'); fi",
     "t() { if [ \"$1\" -ge 3600 ]; then printf '%dh %02dm' $(( $1 / 3600 )) $(( $1 % 3600 / 60 )); elif [ \"$1\" -ge 60 ]; then printf '%dm %02ds' $(( $1 / 60 )) $(( $1 % 60 )); else printf '%ds' \"$1\"; fi; }",
-    // bar <per mille done> <bar text> <planned seconds left> <label>
-    'bar() { e=$(( $(date +%s) - T0 )); if [ "$1" -ge 30 ] && [ "$e" -ge 20 ]; then l=$(( e * (1000 - $1) / $1 )); else l=$3; fi; ' +
-      "printf '\\r[%s] %3d%%  %s left  %s   ' \"$2\" $(( $1 / 10 )) \"$(t $l)\" \"$4\"; }"
+    // bar <per mille done> <filled part> <empty part> <planned seconds left> <tool> <strokes text>
+    'bar() { e=$(( $(date +%s) - T0 )); if [ "$1" -ge 30 ] && [ "$e" -ge 20 ]; then l=$(( e * (1000 - $1) / $1 )); else l=$4; fi; ' +
+      'if [ "$5" = eraser ]; then tc=$E; ic="◌"; else tc=$B; ic="✏"; fi; ' +
+      "printf '\\r  %s%s%s%s%s  %s%4d%%%s   %s%s left%s   %s%s %s%s   %s%s%s\\033[K' " +
+      '"$A" "$2" "$G" "$3" "$R" "$B" $(( $1 / 10 )) "$R" "$C" "$(t $l)" "$R" "$tc" "$ic" "$5" "$R" "$D" "$6" "$R"; }'
   ];
   function withProgress(L, nStrokes) {
     var head = HEAD.length, body = L.slice(head), total = 0, i;
     body.forEach(function (l) { total += cost(l)[0]; });
-    var step = Math.max(total / 200, 2), next = 0, done = 0, at = 0, strokes = 0, tool = 'brush', out = [], WIDTH = 24;
+    var step = Math.max(total / 200, 2), next = 0, at = 0, strokes = 0, tool = 'brush', out = [];
     function fmtN(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function fmtT(s) { s = Math.round(s); return s >= 3600 ? Math.floor(s / 3600) + 'h ' + ('0' + Math.floor(s % 3600 / 60)).slice(-2) + 'm' : s >= 60 ? Math.floor(s / 60) + 'm ' + ('0' + s % 60).slice(-2) + 's' : s + 's'; }
+    function rep(c, n) { return new Array(Math.max(0, n) + 1).join(c); }
     function bar(pm) {
-      var full = Math.round(pm * WIDTH / 1000), b = new Array(full + 1).join('#') + new Array(WIDTH - full + 1).join('-');
-      return 'bar ' + pm + ' "' + b + '" ' + Math.round(total - at) + ' "' + tool + ' | ' + fmtN(strokes) + '/' + fmtN(nStrokes) + ' strokes"';
+      var e8 = Math.round(pm * BAR_W * 8 / 1000), full = Math.floor(e8 / 8), part = EIGHTHS[e8 % 8];
+      var filled = rep('█', full) + part, empty = rep('░', BAR_W - full - (part ? 1 : 0));
+      return 'bar ' + pm + ' "' + filled + '" "' + empty + '" ' + Math.round(total - at) + ' ' + tool + ' "' + fmtN(strokes) + ' / ' + fmtN(nStrokes) + '"';
     }
+    out.push("printf '\\n  %sHeyTea sticker drawer%s  %s%s strokes · about %s%s\\n\\n' \"$B\" \"$R\" \"$D\" \"" + fmtN(nStrokes) + '" "' + fmtT(total) + '" "$R"');
     for (i = 0; i < body.length; i++) {
       var l = body[i];
       if (l === STROKE_END) { strokes++; continue; }
@@ -1325,7 +1337,7 @@
       out.push(l);
       at += cost(l)[0];
     }
-    out.push(bar(1000), "printf '\\n'", 'echo "Finished in $(t $(( $(date +%s) - T0 )))"');
+    out.push(bar(1000), "printf '\\n\\n  %s✔ Finished in %s%s\\n\\n' \"$OK\" \"$(t $(( $(date +%s) - T0 )))\" \"$R\"");
     return L.slice(0, head).concat(BAR_FN, out);
   }
 
