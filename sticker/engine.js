@@ -1198,30 +1198,57 @@
   }
   // Ph: phone settings { rx, ry, rw, rh, method: 'sw'|'mo'|'fe', dur, ex, ey, tx, ty, ex2, tx2, sd, pt, tdev, mx, my, scw, sch, mc }
   /*
-   * Every line is drawn there and back. HeyTea smooths a stroke through the midpoints between touch events, so
-   * when the finger lifts the last stretch is never drawn: a 40 ms swipe loses about a third of its length at
-   * the end (measured 87 px of 252), a slower one less. Each pass starts in exactly the right place, and the
-   * return pass starts where the first one's tail went missing, so together they cover the whole line.
-   * Taps (dots) are drawn whole and stay single.
+   * HeyTea smooths every stroke: for each touch event it reads, the pen moves halfway from where it is towards
+   * the finger, and lifting the finger doesn't move it further. Measured: press, one move, lift draws exactly
+   * half the line; adding a wiggle at the end leaves 1/8 undrawn; any line is exact when each move aims at
+   * twice the step (pen + 2 * (target - pen)), on a fresh canvas and on one with 6,500 strokes alike.
+   * A fast swipe is read only about once per screen frame, and a canvas full of strokes renders slowly, so
+   * swipes lose more and more of each line as a drawing grows (100 ms lines: 50 px lost of 253 on a fresh
+   * canvas, 189 px at 6,500 strokes). So by default ('mo') a line is sent as separate motion events, each read
+   * on its own, aimed at twice the step. Dots are single taps, which are always exact.
+   * 'sw' (swipes, for Android before 10, which has no motionevent) draws each line there and back at >= 80 ms.
    */
+  function aimed(L, pts, Ph) {
+    // pts: screen points of one stroke; the finger may leave the canvas but not the screen
+    var sw = +Ph.scw || 1440, shh = +Ph.sch || 3200, MAX = 260;
+    function onScreen(v) { return v[0] >= 1 && v[0] <= sw - 2 && v[1] >= 1 && v[1] <= shh - 2; }
+    var pen = pts[0];
+    L.push('input motionevent DOWN ' + pen[0] + ' ' + pen[1]);
+    for (var i = 1; i < pts.length; i++) {
+      var to = pts[i], d = Math.hypot(to[0] - pen[0], to[1] - pen[1]);
+      if (!d) continue;
+      for (var k = Math.max(1, Math.ceil(d / MAX)); k < 4096; k *= 2) {
+        var ok = true, fin = [];
+        for (var j = 1; j <= k && ok; j++) {
+          var t = [Math.round(pen[0] + (to[0] - pen[0]) * j / k), Math.round(pen[1] + (to[1] - pen[1]) * j / k)];
+          var prev = j === 1 ? pen : [Math.round(pen[0] + (to[0] - pen[0]) * (j - 1) / k), Math.round(pen[1] + (to[1] - pen[1]) * (j - 1) / k)];
+          var aim = [2 * t[0] - prev[0], 2 * t[1] - prev[1]];
+          if (!onScreen(aim)) ok = false; else fin.push(aim);
+        }
+        if (ok) { fin.forEach(function (a) { L.push('input motionevent MOVE ' + a[0] + ' ' + a[1]); }); break; }
+      }
+      pen = to;
+    }
+    L.push('input motionevent UP ' + pen[0] + ' ' + pen[1]);
+  }
   function script(strokes, W, H, Ph) {
     function X(p) { return Math.round(inX(Ph, Ph.rx + (p[0] + 0.5) / W * Ph.rw)); }
     function Y(p) { return Math.round(inY(Ph, Ph.ry + (p[1] + 0.5) / H * Ph.rh)); }
     var ms = Math.max(LINE_MS, +Ph.dur || 100);
     function swipe(a, b) { var tap = X(a) === X(b) && Y(a) === Y(b); L.push('input swipe ' + X(a) + ' ' + Y(a) + ' ' + X(b) + ' ' + Y(b) + ' ' + (tap ? TAP_MS : ms)); }
-    function motion(q) {
-      L.push('input motionevent DOWN ' + X(q[0]) + ' ' + Y(q[0]));
-      for (var i = 1; i < q.length; i++) L.push('input motionevent MOVE ' + X(q[i]) + ' ' + Y(q[i]));
-      L.push('input motionevent UP ' + X(q[q.length - 1]) + ' ' + Y(q[q.length - 1]));
-    }
-    var L = HEAD.concat(['# HeyTea sticker auto-draw: ' + strokes.length + ' strokes, each line there and back']), tool = 0, sid = 0;
+    var L = HEAD.concat(['# HeyTea sticker auto-draw: ' + strokes.length + ' strokes' + (Ph.method === 'sw' ? ', each line there and back' : Ph.method === 'mo' ? ', lines as aimed motion events' : '')]), tool = 0, sid = 0;
+    // start with the brush: a run that begins with the eraser picked would erase its first tile instead
+    if (Ph.tx || Ph.ty || (Ph.tx2 || '').trim()) toolSwitch(0, L, Ph);
     strokes.forEach(function (p) {
       var t = p.er ? 1 : 0, back = p.slice().reverse(), moves = p.some(function (q) { return X(q) !== X(p[0]) || Y(q) !== Y(p[0]); });
       if (t !== tool) { tool = t; toolSwitch(t, L, Ph); }
       if (Ph.method === 'fe') {
         fstroke(L, fpts(p, W, H, Ph), (sid++) % 60000 + 1, Ph);
         if (moves) fstroke(L, fpts(back, W, H, Ph), (sid++) % 60000 + 1, Ph);
-      } else if (Ph.method === 'mo') { motion(p); if (moves) motion(back); }
+      } else if (Ph.method === 'mo') {
+        if (!moves) swipe(p[0], p[0]);
+        else aimed(L, p.map(function (q) { return [X(q), Y(q)]; }), Ph);
+      }
       else if (p.length === 1) swipe(p[0], p[0]);
       else for (var j = 1; j < p.length; j++) {
         swipe(p[j - 1], p[j]);
@@ -1233,12 +1260,14 @@
   // a short script that draws a line, erases a gap in it, then draws a second line
   function testScript(W, H, Ph) {
     var L = HEAD.concat(['# Tool switch test: pen line, eraser gap, pen line']);
+    if (Ph.tx || Ph.ty) toolSwitch(0, L, Ph);
     function go(y, a, b) {
       if (Ph.method === 'fe') fstroke(L, fpts([[a * W - 0.5, y * H - 0.5], [b * W - 0.5, y * H - 0.5]], W, H, Ph), 1, Ph);
       else {
         var ya = Math.round(Ph.ry + Ph.rh * y), xa = Math.round(Ph.rx + Ph.rw * a), xb = Math.round(Ph.rx + Ph.rw * b);
-        // there and back, like the drawing (HeyTea cuts the end off a stroke)
-        L.push('input swipe ' + xa + ' ' + ya + ' ' + xb + ' ' + ya + ' 200', 'input swipe ' + xb + ' ' + ya + ' ' + xa + ' ' + ya + ' 200');
+        // drawn like the drawing's lines (HeyTea cuts the end off a stroke otherwise)
+        if (Ph.method === 'mo') aimed(L, [[xa, ya], [xb, ya]], Ph);
+        else L.push('input swipe ' + xa + ' ' + ya + ' ' + xb + ' ' + ya + ' 200', 'input swipe ' + xb + ' ' + ya + ' ' + xa + ' ' + ya + ' 200');
       }
     }
     L.push('echo "pen line 1"'); go(0.3, 0.1, 0.9);
@@ -1254,7 +1283,7 @@
       var m = l.match(/^sleep ([\d.]+)/), sw = l.match(/^input swipe \S+ \S+ \S+ \S+ (\d+)/);
       if (/^sendevent/.test(l)) { sec += 0.006; calls++; }
       else if (sw) { sec += 0.06 + sw[1] / 1000; calls++; }
-      else if (/^input/.test(l)) { sec += 0.1; calls++; }
+      else if (/^input/.test(l)) { sec += 0.12; calls++; }   // motionevent: measured 118 ms each
       else if (m) sec += +m[1];
     });
     return { sec: sec, calls: calls };
