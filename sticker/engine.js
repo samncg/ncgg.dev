@@ -1153,8 +1153,16 @@
 
   function sh(lines) { return lines.join('\n') + '\n'; }
   var HEAD = ['#!/system/bin/sh', '[ -z "$DRAW_LF" ] && { tr -d "\\r" < "$0" > /sdcard/.draw_lf.sh; DRAW_LF=1 sh /sdcard/.draw_lf.sh; exit 0; } #'];
+  // HeyTea ignores a touch that starts outside the canvas (the planner lets edge strokes reach a cell past it,
+  // and those were dropped whole), so every point is kept on the canvas; the round tip still reaches the edge
+  function inX(Ph, v) { return Math.max(Ph.rx, Math.min(Ph.rx + Ph.rw - 1, v)); }
+  function inY(Ph, v) { return Math.max(Ph.ry, Math.min(Ph.ry + Ph.rh - 1, v)); }
+  // HeyTea leaves off the last 20..32 ms of every stroke (measured with commands back to back: a 40 ms swipe of
+  // 253 px lost 124 px typically and 144 at worst, 80 ms 60/96, 120 ms 49/68). Lines are drawn there and back
+  // and take at least 80 ms, so neither pass loses half; taps are never cut and stay quick.
+  var LINE_MS = 80, TAP_MS = 40;
   function fpts(p, W, H, Ph) {
-    var Pt = p.map(function (a) { return [Ph.rx + (a[0] + 0.5) / W * Ph.rw, Ph.ry + (a[1] + 0.5) / H * Ph.rh]; }), out = [Pt[0]];
+    var Pt = p.map(function (a) { return [inX(Ph, Ph.rx + (a[0] + 0.5) / W * Ph.rw), inY(Ph, Ph.ry + (a[1] + 0.5) / H * Ph.rh)]; }), out = [Pt[0]];
     for (var i = 1; i < Pt.length; i++) {
       var a = Pt[i - 1], b = Pt[i], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 40));
       for (var k = 1; k <= n; k++) out.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
@@ -1197,9 +1205,10 @@
    * Taps (dots) are drawn whole and stay single.
    */
   function script(strokes, W, H, Ph) {
-    function X(p) { return Math.round(Ph.rx + (p[0] + 0.5) / W * Ph.rw); }
-    function Y(p) { return Math.round(Ph.ry + (p[1] + 0.5) / H * Ph.rh); }
-    function swipe(a, b) { L.push('input swipe ' + X(a) + ' ' + Y(a) + ' ' + X(b) + ' ' + Y(b) + ' ' + Ph.dur); }
+    function X(p) { return Math.round(inX(Ph, Ph.rx + (p[0] + 0.5) / W * Ph.rw)); }
+    function Y(p) { return Math.round(inY(Ph, Ph.ry + (p[1] + 0.5) / H * Ph.rh)); }
+    var ms = Math.max(LINE_MS, +Ph.dur || 100);
+    function swipe(a, b) { var tap = X(a) === X(b) && Y(a) === Y(b); L.push('input swipe ' + X(a) + ' ' + Y(a) + ' ' + X(b) + ' ' + Y(b) + ' ' + (tap ? TAP_MS : ms)); }
     function motion(q) {
       L.push('input motionevent DOWN ' + X(q[0]) + ' ' + Y(q[0]));
       for (var i = 1; i < q.length; i++) L.push('input motionevent MOVE ' + X(q[i]) + ' ' + Y(q[i]));
@@ -1229,7 +1238,7 @@
       else {
         var ya = Math.round(Ph.ry + Ph.rh * y), xa = Math.round(Ph.rx + Ph.rw * a), xb = Math.round(Ph.rx + Ph.rw * b);
         // there and back, like the drawing (HeyTea cuts the end off a stroke)
-        L.push('input swipe ' + xa + ' ' + ya + ' ' + xb + ' ' + ya + ' 400', 'input swipe ' + xb + ' ' + ya + ' ' + xa + ' ' + ya + ' 400');
+        L.push('input swipe ' + xa + ' ' + ya + ' ' + xb + ' ' + ya + ' 200', 'input swipe ' + xb + ' ' + ya + ' ' + xa + ' ' + ya + ' 200');
       }
     }
     L.push('echo "pen line 1"'); go(0.3, 0.1, 0.9);
@@ -1237,13 +1246,15 @@
     toolSwitch(0, L, Ph); L.push('echo "pen line 2"'); go(0.6, 0.1, 0.9); L.push('echo done');
     return sh(L);
   }
-  // rough phone time from the script: each sendevent ~6 ms, each input command ~0.3 s, plus sleeps
+  // phone time from the script: each sendevent ~6 ms; each input command ~60 ms to start (measured: 98 ms for a
+  // 40 ms swipe, 162 ms for a 100 ms one) plus its own duration; plus sleeps
   function estimate(text) {
     var sec = 0, calls = 0;
     text.split('\n').forEach(function (l) {
-      var m = l.match(/^sleep ([\d.]+)/);
+      var m = l.match(/^sleep ([\d.]+)/), sw = l.match(/^input swipe \S+ \S+ \S+ \S+ (\d+)/);
       if (/^sendevent/.test(l)) { sec += 0.006; calls++; }
-      else if (/^input/.test(l)) { sec += 0.3; calls++; }
+      else if (sw) { sec += 0.06 + sw[1] / 1000; calls++; }
+      else if (/^input/.test(l)) { sec += 0.1; calls++; }
       else if (m) sec += +m[1];
     });
     return { sec: sec, calls: calls };

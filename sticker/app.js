@@ -13,7 +13,7 @@
 
   var KEY_PHONE = 'ncgg:sticker:phone';
   var PHONE_DEFAULTS = {
-    rx: 100, ry: 600, rw: 880, rh: 880, pen: 6, esz: 8, method: 'sw', dur: 40,
+    rx: 100, ry: 600, rw: 880, rh: 880, pen: 6, esz: 8, method: 'sw', dur: 100,
     ex: 0, ey: 0, tx: 0, ty: 0, ex2: '', tx2: '', sd: 2, pt: 120,
     tdev: '/dev/input/event8', mx: 121999, my: 265599, scw: 1220, sch: 2656, mc: false
   };
@@ -171,7 +171,7 @@
   $('#tool-size-fields').innerHTML = field('pen', 'Brush size (px)', { small: 'How wide HeyTea’s smallest brush really draws on this phone: about 3 dp, 10.5 px at 560 dpi. Finding the canvas from a screenshot sets it.', step: 0.5 }) +
     field('esz', 'Eraser size (px)', { step: 0.5 });
   $('#method-fields').innerHTML = field('method', 'How the pen moves', { options: [['sw', 'swipes · any Android'], ['mo', 'continuous · Android 10+'], ['fe', 'fast · raw touch events']] }) +
-    field('dur', 'Swipe time (ms)', { small: 'Lower is faster; raise it if lines come out broken.' });
+    field('dur', 'Line time (ms)', { small: 'How long each line takes. HeyTea leaves off the last 20–30 ms of a stroke, so lines are drawn there and back and never faster than 80 ms. Dots stay quick.' });
   $('#tool-fields').innerHTML = field('ex', 'Eraser X') + field('ey', 'Eraser Y') + field('tx', 'Pen X') + field('ty', 'Pen Y');
   $('#tool-extra').innerHTML = field('ex2', 'Extra taps after eraser', { text: true, placeholder: 'x,y; x,y' }) +
     field('tx2', 'Extra taps after pen', { text: true, placeholder: 'x,y; x,y' }) +
@@ -261,7 +261,7 @@
   var planner = null, matcher = null, seq = 0, planWanted = null, planBusy = false, matchId = 0;
 
   function spawn() {
-    var w = new Worker('worker.js?v=41');
+    var w = new Worker('worker.js?v=42');
     w.onerror = function () { canWork = false; };
     return w;
   }
