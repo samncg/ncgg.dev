@@ -1152,7 +1152,7 @@
   /* ---------- script for the phone ---------- */
 
   function sh(lines) { return lines.join('\n') + '\n'; }
-  var HEAD = ['#!/system/bin/sh', '[ -z "$DRAW_LF" ] && { tr -d "\\r" < "$0" > /sdcard/.draw_lf.sh; DRAW_LF=1 sh /sdcard/.draw_lf.sh; exit 0; } #'];
+  var HEAD = ['#!/system/bin/sh', '[ -z "$DRAW_LF" ] && { tr -d "\\r" < "$0" > /sdcard/.draw_lf.sh; DRAW_LF=1 sh /sdcard/.draw_lf.sh "$@"; exit $?; } #'];
   // HeyTea ignores a touch that starts outside the canvas (the planner lets edge strokes reach a cell past it,
   // and those were dropped whole), so every point is kept on the canvas; the round tip still reaches the edge
   function inX(Ph, v) { return Math.max(Ph.rx, Math.min(Ph.rx + Ph.rw - 1, v)); }
@@ -1256,7 +1256,7 @@
       }
       L.push(STROKE_END);
     });
-    return sh(withProgress(L, strokes.length));
+    return sh(withProgress(L, strokes.length, Ph));
   }
   // a short script that draws a line, erases a gap in it, then draws a second line
   function testScript(W, H, Ph) {
@@ -1285,6 +1285,7 @@
     if (/^sendevent/.test(l)) return [0.006, 1];
     if (sw) return [0.06 + sw[1] / 1000, 1];
     if (/^input/.test(l)) return [0.12, 1];
+    if (/^ck /.test(l)) return [0.15, 0];   // checkpoint: one dumpsys window
     return [m ? +m[1] : 0, 0];
   }
   function estimate(text) {
@@ -1294,31 +1295,48 @@
   }
 
   /*
-   * A progress bar in the script, one line redrawn in place (\r ... ESC[K):
-   *   ████████████▋░░░░░░░░░░░   52%   31m 05s left   ✏ brush   12,480 / 23,712
-   * a header first, and "✔ Finished in ..." at the end. The bar fills in eighths of a block. Progress is
-   * weighted by each command's expected time, so it moves evenly. Time left starts from the plan's estimate;
-   * after 20 s and 3% it comes from the drawing's own pace (elapsed / done * left), which follows the phone
-   * as it slows down on a full canvas. Colours (256-colour ANSI) are left out when NO_COLOR is set:
-   *   adb shell "NO_COLOR=1 sh /sdcard/draw.sh"
-   * The line stays under 80 columns so it never wraps.
+   * What a draw script does around the strokes:
+   * - a progress bar, one line redrawn in place (\r ... ESC[K):
+   *     ████████████▋░░░░░░░░░░░   52%   31m 05s left   ✏ brush   12,480 / 23,712
+   *   with a header first and "✔ Finished in ..." at the end. The bar fills in eighths of a block; progress
+   *   is weighted by each command's expected time. Time left starts from the plan's estimate, and after 20 s
+   *   and 3% comes from the drawing's own pace, leaving out time spent paused. Colours (256-colour ANSI) are
+   *   left out when NO_COLOR is set. The line stays under 80 columns so it never wraps.
+   * - checkpoints between strokes (one per bar update), each of which
+   *   - saves how far the drawing got and which tool was in use, so "sh draw.sh resume" carries on there
+   *     after it was stopped (only for the same script: the file holds the script's id),
+   *   - pauses while HeyTea isn't the window in front (a notification shade, a call, another app), and
+   *     picks the tool again before carrying on;
+   * - keeps the screen on while drawing (stay on while plugged in), and puts the setting back at the end or
+   *   when stopped (Ctrl+C), printing how to resume;
+   * - vibrates the phone when it is done.
    */
-  var STROKE_END = '\u0001', BAR_W = 24, EIGHTHS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
+  var STROKE_END = '\u0001', BAR_W = 24, EIGHTHS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉'], PROGRESS_FILE = '/sdcard/.heytea-draw-progress';
   var BAR_FN = [
-    'T0=$(date +%s)',
+    'T0=$(date +%s); PT=0; START=0; PF=' + PROGRESS_FILE,
     "if [ -z \"$NO_COLOR\" ]; then A=$(printf '\\033[38;5;141m'); G=$(printf '\\033[38;5;238m'); B=$(printf '\\033[1m'); " +
       "C=$(printf '\\033[38;5;80m'); E=$(printf '\\033[38;5;211m'); D=$(printf '\\033[38;5;245m'); OK=$(printf '\\033[38;5;114m'); R=$(printf '\\033[0m'); fi",
     "t() { if [ \"$1\" -ge 3600 ]; then printf '%dh %02dm' $(( $1 / 3600 )) $(( $1 % 3600 / 60 )); elif [ \"$1\" -ge 60 ]; then printf '%dm %02ds' $(( $1 / 60 )) $(( $1 % 60 )); else printf '%ds' \"$1\"; fi; }",
     // bar <per mille done> <filled part> <empty part> <planned seconds left> <tool> <strokes text>
-    'bar() { e=$(( $(date +%s) - T0 )); if [ "$1" -ge 30 ] && [ "$e" -ge 20 ]; then l=$(( e * (1000 - $1) / $1 )); else l=$4; fi; ' +
+    'bar() { e=$(( $(date +%s) - T0 - PT )); if [ $(( $1 - P0 )) -ge 30 ] && [ "$e" -ge 20 ]; then l=$(( e * (1000 - $1) / ($1 - P0 + 1) )); else l=$4; fi; ' +
       'if [ "$5" = eraser ]; then tc=$E; ic="◌"; else tc=$B; ic="✏"; fi; ' +
       "printf '\\r  %s%s%s%s%s  %s%4d%%%s   %s%s left%s   %s%s %s%s   %s%s%s\\033[K' " +
-      '"$A" "$2" "$G" "$3" "$R" "$B" $(( $1 / 10 )) "$R" "$C" "$(t $l)" "$R" "$tc" "$ic" "$5" "$R" "$D" "$6" "$R"; }'
+      '"$A" "$2" "$G" "$3" "$R" "$B" $(( $1 / 10 )) "$R" "$C" "$(t $l)" "$R" "$tc" "$ic" "$5" "$R" "$D" "$6" "$R"; }',
+    // is HeyTea the window in front?
+    'front() { dumpsys window 2>/dev/null | grep mCurrentFocus | grep -q com.heytea; }',
+    // ck <checkpoint> <per mille> <tool>: save progress; wait while HeyTea isn't in front
+    'ck() { echo "$ID $1 $2 $3" > $PF; if ! front; then p0=$(date +%s); ' +
+      "printf '\\r  %s⏸  Paused: HeyTea is not on screen. Open the sticker canvas to carry on.%s\\033[K' \"$E\" \"$R\"; " +
+      'while ! front; do sleep 2; done; sleep 1; tool_$3; PT=$(( PT + $(date +%s) - p0 )); fi; }',
+    'stay=$(settings get global stay_on_while_plugged_in 2>/dev/null); svc power stayon usb 2>/dev/null',
+    'restore() { if [ -n "$stay" ] && [ "$stay" != null ]; then settings put global stay_on_while_plugged_in "$stay" 2>/dev/null; else svc power stayon false 2>/dev/null; fi; }',
+    "stopped() { restore; printf '\\n\\n  %sStopped.%s Carry on where it left off with:  adb shell sh /sdcard/draw.sh resume\\n\\n' \"$E\" \"$R\"; exit 130; }",
+    'trap stopped INT TERM HUP'
   ];
-  function withProgress(L, nStrokes) {
+  function withProgress(L, nStrokes, Ph) {
     var head = HEAD.length, body = L.slice(head), total = 0, i;
     body.forEach(function (l) { total += cost(l)[0]; });
-    var step = Math.max(total / 200, 2), next = 0, at = 0, strokes = 0, tool = 'brush', out = [];
+    var step = Math.max(total / 200, 2), next = 0, at = 0, strokes = 0, tool = 'brush', out = [], ck = 0, open = false, hash = 5381;
     function fmtN(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
     function fmtT(s) { s = Math.round(s); return s >= 3600 ? Math.floor(s / 3600) + 'h ' + ('0' + Math.floor(s % 3600 / 60)).slice(-2) + 'm' : s >= 60 ? Math.floor(s / 60) + 'm ' + ('0' + s % 60).slice(-2) + 's' : s + 's'; }
     function rep(c, n) { return new Array(Math.max(0, n) + 1).join(c); }
@@ -1327,18 +1345,39 @@
       var filled = rep('█', full) + part, empty = rep('░', BAR_W - full - (part ? 1 : 0));
       return 'bar ' + pm + ' "' + filled + '" "' + empty + '" ' + Math.round(total - at) + ' ' + tool + ' "' + fmtN(strokes) + ' / ' + fmtN(nStrokes) + '"';
     }
+    // the commands that pick each tool, for picking it again after a pause or on resume
+    function toolFn(name, eraser) { var T = []; toolSwitch(eraser, T, Ph); return 'tool_' + name + '() { ' + T.filter(function (l) { return !/^#/.test(l); }).join('; ') + '; }'; }
+    // a checkpoint: close the previous block, save progress, open a block that resume can skip
+    function checkpoint() {
+      var pm = Math.min(999, Math.floor(1000 * at / (total || 1)));
+      if (open) out.push('fi');
+      out.push('if [ ' + ck + ' -ge "$START" ]; then', 'ck ' + ck + ' ' + pm + ' ' + tool, bar(pm));
+      open = true; ck++;
+    }
     out.push("printf '\\n  %sHeyTea sticker drawer%s  %s%s strokes · about %s%s\\n\\n' \"$B\" \"$R\" \"$D\" \"" + fmtN(nStrokes) + '" "' + fmtT(total) + '" "$R"');
+    checkpoint();
     for (i = 0; i < body.length; i++) {
       var l = body[i];
-      if (l === STROKE_END) { strokes++; continue; }
+      if (l === STROKE_END) { strokes++; if (at >= next) { checkpoint(); next += step; } continue; }
       var tm = /^# Tool: (\w+)/.exec(l);
       if (tm) tool = tm[1] === 'pen' ? 'brush' : 'eraser';
-      if (at >= next) { out.push(bar(Math.min(999, Math.floor(1000 * at / (total || 1))))); next += step; }
       out.push(l);
+      for (var c = 0; c < l.length; c++) hash = ((hash * 33) ^ l.charCodeAt(c)) >>> 0;
       at += cost(l)[0];
     }
-    out.push(bar(1000), "printf '\\n\\n  %s✔ Finished in %s%s\\n\\n' \"$OK\" \"$(t $(( $(date +%s) - T0 )))\" \"$R\"");
-    return L.slice(0, head).concat(BAR_FN, out);
+    if (open) out.push('fi');
+    var pre = [
+      'ID=' + hash.toString(36) + '-' + nStrokes,
+      toolFn('brush', 0), toolFn('eraser', 1),
+      // resume: start at the saved checkpoint of this same script, with the tool it was using
+      'if [ "$1" = resume ]; then if [ -f $PF ] && read rid rck rpm rtool < $PF && [ "$rid" = "$ID" ]; then START=$rck; P0=$rpm; ' +
+        "printf '\\n  %sResuming at %d%%%s\\n' \"$B\" $(( rpm / 10 )) \"$R\"; tool_$rtool; " +
+        "else printf '\\n  Nothing to resume for this drawing: starting from the beginning.\\n'; fi; fi",
+      'P0=${P0:-0}'
+    ];
+    out.push(bar(1000), 'restore; rm -f $PF', "printf '\\n\\n  %s✔ Finished in %s%s\\n\\n' \"$OK\" \"$(t $(( $(date +%s) - T0 )))\" \"$R\"",
+      'cmd vibrator_manager synced oneshot 700 >/dev/null 2>&1 || cmd vibrator vibrate 700 >/dev/null 2>&1');
+    return L.slice(0, head).concat(BAR_FN, pre, out);
   }
 
   root.StickerEngine = {

@@ -1,5 +1,5 @@
 /* Runs the planner and the auto-match search off the main thread. */
-importScripts('engine.js?v=44');
+importScripts('engine.js?v=45');
 
 var E = self.StickerEngine, img = null;
 function makeCanvas(w, h) { return new OffscreenCanvas(w, h); }

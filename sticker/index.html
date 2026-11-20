@@ -162,7 +162,9 @@
             <li>Open the custom sticker canvas in HeyTea, pick the black pen, and keep the screen on.</li>
             <li>Start drawing:
               <div class="cmd"><code>adb shell sh /sdcard/draw.sh</code><button class="link" type="button" data-copy-cmd>copy</button></div></li>
-            <li>The terminal shows a progress bar with the time left. To stop early, press Ctrl+C.</li>
+            <li>The terminal shows a progress bar with the time left. The screen stays on while it draws, and it pauses by itself if HeyTea leaves the screen (a call, the notification shade).</li>
+            <li>To stop, press Ctrl+C. To carry on later from where it stopped:
+              <div class="cmd"><code>adb shell sh /sdcard/draw.sh resume</code><button class="link" type="button" data-copy-cmd>copy</button></div></li>
           </ol>
           <details class="more">
             <summary>View the script</summary>
@@ -178,7 +180,7 @@
     <span>runs entirely in your browser</span>
   </footer>
 
-  <script src="engine.js?v=44"></script>
+  <script src="engine.js?v=45"></script>
   <script src="app.js?v=23"></script>
 </body>
 </html>
