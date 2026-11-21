@@ -1160,7 +1160,11 @@
   // HeyTea leaves off the last 20..32 ms of every stroke (measured with commands back to back: a 40 ms swipe of
   // 253 px lost 124 px typically and 144 at worst, 80 ms 60/96, 120 ms 49/68). Lines are drawn there and back
   // and take at least 80 ms, so neither pass loses half; taps are never cut and stay quick.
-  var LINE_MS = 80, TAP_MS = 40;
+  // Dots: on a canvas full of strokes HeyTea ignores a touch that doesn't move by the time it reads it, so quick
+  // taps vanish: on a 36,582-stroke drawing, 0 of 40 taps of 40 ms came out, 88..92% of 150..200 ms ones, and
+  // every dot drawn as press, 2 px aimed move, release (90 of 90). The swipe method (no motion events) uses
+  // 150 ms taps; the default draws dots as that tiny aimed stroke.
+  var LINE_MS = 80, TAP_MS = 150;
   function fpts(p, W, H, Ph) {
     var Pt = p.map(function (a) { return [inX(Ph, Ph.rx + (a[0] + 0.5) / W * Ph.rw), inY(Ph, Ph.ry + (a[1] + 0.5) / H * Ph.rh)]; }), out = [Pt[0]];
     for (var i = 1; i < Pt.length; i++) {
@@ -1236,18 +1240,35 @@
     function Y(p) { return Math.round(inY(Ph, Ph.ry + (p[1] + 0.5) / H * Ph.rh)); }
     var ms = Math.max(LINE_MS, +Ph.dur || 100);
     function swipe(a, b) { var tap = X(a) === X(b) && Y(a) === Y(b); L.push('input swipe ' + X(a) + ' ' + Y(a) + ' ' + X(b) + ' ' + Y(b) + ' ' + (tap ? TAP_MS : ms)); }
+    // dots in a row that overlap anyway (no more than 3/4 of the brush apart) are drawn as one aimed line; a
+    // dot on its own is a press, a 2 px aimed move (the pen goes 1 px) and a release
+    var run = [], gap = 0.75 * (+Ph.pen || 6), sw = +Ph.scw || 1440;
+    function dotRun(x, y) {
+      var last = run[run.length - 1];
+      if (last && (last[1] !== y || Math.abs(x - last[0]) > gap)) flushDots();
+      run.push([x, y]);
+    }
+    function flushDots() {
+      if (!run.length) return;
+      var a = run[0], b = run[run.length - 1];
+      if (run.length > 1 && (a[0] !== b[0] || a[1] !== b[1])) aimed(L, [a, b], Ph);
+      else { var d = a[0] + 2 < sw - 1 ? 2 : -2; L.push('input motionevent DOWN ' + a[0] + ' ' + a[1], 'input motionevent MOVE ' + (a[0] + d) + ' ' + a[1], 'input motionevent UP ' + (a[0] + d / 2) + ' ' + a[1]); }
+      for (var k = 0; k < run.length; k++) L.push(STROKE_END);
+      run = [];
+    }
     var L = HEAD.concat(['# HeyTea sticker auto-draw: ' + strokes.length + ' strokes' + (Ph.method === 'sw' ? ', each line there and back' : Ph.method === 'mo' ? ', lines as aimed motion events' : '')]), tool = 0, sid = 0;
     // start with the brush: a run that begins with the eraser picked would erase its first tile instead
     if (Ph.tx || Ph.ty || (Ph.tx2 || '').trim()) toolSwitch(0, L, Ph);
     strokes.forEach(function (p) {
       var t = p.er ? 1 : 0, back = p.slice().reverse(), moves = p.some(function (q) { return X(q) !== X(p[0]) || Y(q) !== Y(p[0]); });
-      if (t !== tool) { tool = t; toolSwitch(t, L, Ph); }
+      if (t !== tool) { flushDots(); tool = t; toolSwitch(t, L, Ph); }
       if (Ph.method === 'fe') {
         fstroke(L, fpts(p, W, H, Ph), (sid++) % 60000 + 1, Ph);
         if (moves) fstroke(L, fpts(back, W, H, Ph), (sid++) % 60000 + 1, Ph);
       } else if (Ph.method === 'mo') {
-        if (!moves) swipe(p[0], p[0]);
-        else aimed(L, p.map(function (q) { return [X(q), Y(q)]; }), Ph);
+        if (!moves) { dotRun(X(p[0]), Y(p[0])); return; }
+        flushDots();
+        aimed(L, p.map(function (q) { return [X(q), Y(q)]; }), Ph);
       }
       else if (p.length === 1) swipe(p[0], p[0]);
       else for (var j = 1; j < p.length; j++) {
@@ -1256,6 +1277,7 @@
       }
       L.push(STROKE_END);
     });
+    flushDots();
     return sh(withProgress(L, strokes.length, Ph));
   }
   // a short script that draws a line, erases a gap in it, then draws a second line
